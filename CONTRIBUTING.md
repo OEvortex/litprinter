@@ -18,19 +18,20 @@ Please be respectful and considerate of others when contributing to this project
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/litprinter.git
+   git clone https://github.com/OEvortex/litprinter.git
    cd litprinter
    ```
 
 2. Create a virtual environment and install development dependencies:
    ```
    python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   venv\Scripts\activate  # On Windows
    pip install -e ".[dev]"
    ```
 
 ## Running Tests
 
+To run the tests, use the following command:
 ```
 pytest
 ```
