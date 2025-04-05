@@ -75,6 +75,10 @@ Feature requests are welcome! Please provide:
 - Why it would be useful
 - Any implementation ideas you have
 
+## License
+
+This project is licensed under the Apache License 2.0. See the LICENSE file for details.
+
 ## Questions?
 
 If you have any questions, feel free to open an issue or reach out to the maintainers.
