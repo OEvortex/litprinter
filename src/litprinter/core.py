@@ -31,10 +31,10 @@ from pygments.formatters import Terminal256Formatter, HtmlFormatter
 from pygments.lexers import PythonLexer as PyLexer, Python3Lexer as Py3Lexer
 from pygments.token import Token
 from typing import Any, List, Type, Optional, Dict, Callable
-from .coloring import (
+from .styles import (
     JARVIS, RICH, MODERN, NEON, CYBERPUNK, DRACULA, MONOKAI,
     SOLARIZED, NORD, GITHUB, VSCODE, MATERIAL, RETRO, OCEAN, AUTUMN,
-    create_custom_style
+    SYNTHWAVE, FOREST, MONOCHROME, SUNSET, create_custom_style
 )
 import json
 
@@ -85,6 +85,14 @@ def colorize(s, color_style=None):
             formatter = Terminal256Formatter(style=OCEAN)
         elif style_name == 'autumn':
             formatter = Terminal256Formatter(style=AUTUMN)
+        elif style_name == 'synthwave':
+            formatter = Terminal256Formatter(style=SYNTHWAVE)
+        elif style_name == 'forest':
+            formatter = Terminal256Formatter(style=FOREST)
+        elif style_name == 'monochrome':
+            formatter = Terminal256Formatter(style=MONOCHROME)
+        elif style_name == 'sunset':
+            formatter = Terminal256Formatter(style=SUNSET)
         else:
             # Try to use the string as a style name
             formatter = Terminal256Formatter(style=color_style)
