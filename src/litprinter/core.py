@@ -24,8 +24,17 @@ import functools
 from contextlib import contextmanager
 from os.path import basename, realpath
 from textwrap import dedent
-import colorama
-import executing
+try:
+    import colorama  # type: ignore
+except ImportError:  # pragma: no cover - optional dependency
+    colorama = None
+
+try:
+    import executing
+except ImportError as exc:  # pragma: no cover - required
+    raise ImportError(
+        "The 'executing' package is required for litprinter."
+    ) from exc
 from pygments import highlight
 from pygments.formatters import Terminal256Formatter, HtmlFormatter
 from pygments.lexers import PythonLexer as PyLexer, Python3Lexer as Py3Lexer
@@ -105,9 +114,14 @@ def colorize(s, color_style=None):
 
 @contextmanager
 def supportTerminalColorsInWindows():
-    colorama.init()
-    yield
-    colorama.deinit()
+    if colorama is not None:
+        colorama.init()
+        try:
+            yield
+        finally:
+            colorama.deinit()
+    else:
+        yield
 
 def stderrPrint(*args, sep=' ', end='\n', flush=False):
     print(*args, file=sys.stderr, sep=sep, end=end, flush=flush)
@@ -123,6 +137,16 @@ def colorizedStderrPrint(s, color_style=None, sep=' ', end='\n', flush=False):
     colored = colorize(s, color_style)
     with supportTerminalColorsInWindows():
         stderrPrint(colored, sep=sep, end=end, flush=flush)
+
+
+def stdoutPrint(s, color_style=None, sep=' ', end='\n', flush=False):
+    """Print to stdout with optional color support."""
+    if color_style is not None:
+        s = colorize(s, color_style)
+        with supportTerminalColorsInWindows():
+            print(s, sep=sep, end=end, flush=flush)
+    else:
+        print(s, sep=sep, end=end, flush=flush)
 
 DEFAULT_PREFIX = 'LIT| '
 DEFAULT_LINE_WRAP_WIDTH = 70
@@ -399,8 +423,7 @@ class LITPrintDebugger:
             callFrame = inspect.currentframe().f_back
             formatted_output = self._format(callFrame, *args)
             if self.disable_colors:
-                with supportTerminalColorsInWindows():
-                    stderrPrint(formatted_output, flush=self.flush)
+                stderrPrint(formatted_output, flush=self.flush)
             else:
                 self.outputFunction(formatted_output, self.color_style)
             if self.log_file:

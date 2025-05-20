@@ -28,6 +28,8 @@ classifiers = [
 keywords = ["debug", "print", "logging", "traceback", "formatting"]
 dependencies = [
     "pygments",
+    "colorama",
+    "executing",
 ]
 requires-python = ">=3.6"
 
