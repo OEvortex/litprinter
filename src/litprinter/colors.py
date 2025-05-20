@@ -133,6 +133,7 @@ class Colors:
         "darkcyan": (0, 139, 139),
         "darkgoldenrod": (184, 134, 11),
         "darkgray": (169, 169, 169),
+        "darkgrey": (169, 169, 169),
         "darkgreen": (0, 100, 0),
         "darkkhaki": (189, 183, 107),
         "darkmagenta": (139, 0, 139),
@@ -144,11 +145,13 @@ class Colors:
         "darkseagreen": (143, 188, 143),
         "darkslateblue": (72, 61, 139),
         "darkslategray": (47, 79, 79),
+        "darkslategrey": (47, 79, 79),
         "darkturquoise": (0, 206, 209),
         "darkviolet": (148, 0, 211),
         "deeppink": (255, 20, 147),
         "deepskyblue": (0, 191, 255),
         "dimgray": (105, 105, 105),
+        "dimgrey": (105, 105, 105),
         "dodgerblue": (30, 144, 255),
         "firebrick": (178, 34, 34),
         "floralwhite": (255, 250, 240),
@@ -159,6 +162,7 @@ class Colors:
         "gold": (255, 215, 0),
         "goldenrod": (218, 165, 32),
         "gray": (128, 128, 128),
+        "grey": (128, 128, 128),
         "green": (0, 128, 0),
         "greenyellow": (173, 255, 47),
         "honeydew": (240, 255, 240),
@@ -176,12 +180,14 @@ class Colors:
         "lightcyan": (224, 255, 255),
         "lightgoldenrodyellow": (250, 250, 210),
         "lightgray": (211, 211, 211),
+        "lightgrey": (211, 211, 211),
         "lightgreen": (144, 238, 144),
         "lightpink": (255, 182, 193),
         "lightsalmon": (255, 160, 122),
         "lightseagreen": (32, 178, 170),
         "lightskyblue": (135, 206, 250),
         "lightslategray": (119, 136, 153),
+        "lightslategrey": (119, 136, 153),
         "lightsteelblue": (176, 196, 222),
         "lightyellow": (255, 255, 224),
         "lime": (0, 255, 0),
@@ -235,6 +241,7 @@ class Colors:
         "skyblue": (135, 206, 235),
         "slateblue": (106, 90, 205),
         "slategray": (112, 128, 144),
+        "slategrey": (112, 128, 144),
         "snow": (255, 250, 250),
         "springgreen": (0, 255, 127),
         "steelblue": (70, 130, 180),
@@ -410,6 +417,35 @@ class Colors:
             b = int(hex_color[4:6], 16)
 
         return Colors.bg_rgb(r, g, b)
+
+    @classmethod
+    def parse(cls, color: str) -> str:
+        """Parse a color name or hex code and return an ANSI color code.
+
+        This helper makes it easy to accept either hex strings like ``"#ff00ff"``
+        or one of the ``NAMED_COLORS`` entries. The comparison is case
+        insensitive and the leading ``#`` is optional for hex codes.
+        """
+        if not color:
+            raise ValueError("Color value cannot be empty")
+
+        color = color.strip()
+        if re.fullmatch(r"#?[0-9a-fA-F]{3}", color) or re.fullmatch(r"#?[0-9a-fA-F]{6}", color):
+            return cls.from_hex(color)
+
+        return cls.from_name(color)
+
+    @classmethod
+    def bg_parse(cls, color: str) -> str:
+        """Parse a color name or hex code and return an ANSI background code."""
+        if not color:
+            raise ValueError("Color value cannot be empty")
+
+        color = color.strip()
+        if re.fullmatch(r"#?[0-9a-fA-F]{3}", color) or re.fullmatch(r"#?[0-9a-fA-F]{6}", color):
+            return cls.bg_from_hex(color)
+
+        return cls.bg_from_name(color)
 
     @staticmethod
     def strip_ansi(text: str) -> str:
