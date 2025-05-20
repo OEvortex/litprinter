@@ -96,10 +96,13 @@ def litprint(
     formatted_output = debugger._format(inspect.currentframe().f_back, *args)
     if debugger.disable_colors:
         from .core import stderrPrint
-        with debugger.outputFunction():
-            stderrPrint(formatted_output, sep=sep, end=end, flush=flush)
+        stderrPrint(formatted_output, sep=sep, end=end, flush=flush)
     else:
-        debugger.outputFunction(formatted_output, debugger.color_style, sep=sep, end=end, flush=flush)
+        if debugger.outputFunction is print:
+            from .core import stdoutPrint
+            stdoutPrint(formatted_output, debugger.color_style, sep=sep, end=end, flush=flush)
+        else:
+            debugger.outputFunction(formatted_output, debugger.color_style, sep=sep, end=end, flush=flush)
         
     return passthrough
 
@@ -183,9 +186,12 @@ def log(
     formatted_output = debugger._format(inspect.currentframe().f_back, *args)
     if debugger.disable_colors:
         from .core import stderrPrint
-        with debugger.outputFunction():
-            stderrPrint(formatted_output, sep=sep, end=end, flush=flush)
+        stderrPrint(formatted_output, sep=sep, end=end, flush=flush)
     else:
-        debugger.outputFunction(formatted_output, debugger.color_style, sep=sep, end=end, flush=flush)
+        if debugger.outputFunction is print:
+            from .core import stdoutPrint
+            stdoutPrint(formatted_output, debugger.color_style, sep=sep, end=end, flush=flush)
+        else:
+            debugger.outputFunction(formatted_output, debugger.color_style, sep=sep, end=end, flush=flush)
         
     return passthrough

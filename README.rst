@@ -12,6 +12,8 @@ Installation
 
     pip install litprinter
 
+This will install the required dependencies ``colorama`` and ``executing`` as well.
+
 Basic Usage
 ----------
 
@@ -22,6 +24,11 @@ Basic Usage
     # Basic usage
     litprint("Hello, world!")
     # Output: LIT -> [script.py:3] in () >>> Hello, world!
+
+    # Print to stdout with colors
+    from litprinter.core import stdoutPrint
+    litprint("Hello", outputFunction=print)            # plain
+    litprint("Hello", outputFunction=stdoutPrint)       # colored
 
     # Print variables with their names
     x, y = 10, 20
