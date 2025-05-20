@@ -890,7 +890,7 @@ class PrettyTraceback:
                 # If we at least have the error line, show it
                 # Format the line number first to ensure padding is applied
                 # before adding ANSI styles so alignment isn't affected
-                line_num_str = f"{frame_info.lineno:>{4}}"
+                line_num_str = f"{frame_info.lineno:>4}"
                 styled_line_num = Styles.LineNo(line_num_str)
                 code_context_lines.append(
                     f"  {Styles.ErrorMarker(ERROR_LINE_MARKER)} {styled_line_num} {LINE_SEPARATOR} {Styles.Bold(frame_info.line)}"
