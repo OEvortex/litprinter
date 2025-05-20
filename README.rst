@@ -17,7 +17,7 @@ Basic Usage
 
 .. code-block:: python
 
-    from litprinter import litprint, lit
+    from litprinter import litprint, lit, cprint
 
     # Basic usage
     litprint("Hello, world!")
@@ -27,6 +27,9 @@ Basic Usage
     x, y = 10, 20
     lit(x, y)
     # Output: LIT -> [script.py:7] in () >>> x: 10, y: 20
+
+    # Rich-style printing with simple markup
+    cprint("[red]Error:[/red] something went wrong")
 
 Features
 --------
