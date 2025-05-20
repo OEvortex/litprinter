@@ -1,3 +1,4 @@
+import builtins
 import re
 import sys
 from typing import Iterable, List
@@ -51,8 +52,15 @@ def cprint(
 
     Use syntax like ``[red]error[/red]`` or ``[bold]bold text[/bold]``. Unknown
     tags are printed literally.
+    Also supports being used as a drop-in replacement for print, including when a slice is passed as an argument.
     """
-    text = sep.join(str(o) for o in objects)
+    # Convert slice objects to string representation for compatibility with print
+    text = sep.join(str(o) if not isinstance(o, slice) else str(o) for o in objects)
     formatted = _parse_markup(text)
-    print(formatted, file=file, end=end, flush=flush)
+    builtins.print(formatted, file=file, end=end, flush=flush)
+
+
+def print(*args, **kwargs):
+    """Alias for cprint, so this module's print behaves like cprint."""
+    return cprint(*args, **kwargs)
 
