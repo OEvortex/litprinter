@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "litprinter"
-version = "0.2.1"
+version = "0.2.2"
 description = "The most sophisticated debug printing library for Python with rich formatting, syntax highlighting, and beautiful tracebacks"
 readme = "README.md"
 authors = [

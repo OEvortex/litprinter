@@ -659,29 +659,14 @@ class PrettyTraceback:
         if val.startswith("<") and val.endswith(">"): return Styles.ValueContainer(val)
         return Styles.LocalsValue(val)
     def _format_locals(self, locals_dict: Dict[str, Any]) -> List[str]:
-        """Format local variables for display in the traceback.
-
-        This method formats local variables in a two-column layout with syntax highlighting
-        based on the variable type. It handles truncation of large values and limits the
-        number of variables shown.
-
-        Args:
-            locals_dict: Dictionary of local variable names and values
-
-        Returns:
-            A list of formatted strings representing the local variables
-        """
+        """Format local variables for display in the traceback, with type info and better truncation."""
         if not locals_dict:
             return []
 
-        # Prepare the variables for display
         formatted_vars = []
         sorted_items = sorted(locals_dict.items())
         count = 0
-
-        # Process each variable
         for name, value in sorted_items:
-            # Limit the number of variables shown
             if count >= MAX_VARIABLES:
                 remaining = len(sorted_items) - count
                 formatted_vars.append((
@@ -689,57 +674,36 @@ class PrettyTraceback:
                     Styles.Dim(f"<{remaining} more variables>")
                 ))
                 break
-
-            # Format the variable value with error handling
             try:
-                # Use pretty printer to format the value
                 value_repr = self._pp.pformat(value)
-
-                # Truncate long values
                 if len(value_repr) > self.locals_max_string:
                     value_repr = value_repr[:self.locals_max_string - 1] + "…"
+                type_str = f"  {Styles.Dim('[' + type(value).__name__ + ']')}" if not isinstance(value, (int, float, str, bool, type(None))) else ""
             except Exception:
-                # Handle any errors in string representation
                 value_repr = Styles.Error("<exception repr() failed>")
-
-            # Apply color coding based on value type
-            colored_value = self._color_code_value(value_repr)
-
-            # Add to the formatted variables list
+                type_str = ""
+            colored_value = self._color_code_value(value_repr) + type_str
             formatted_vars.append((Styles.LocalsKey(name), colored_value))
             count += 1
-
-        # Prepare for two-column layout
         lines = []
         num_vars = len(formatted_vars)
-
-        # Calculate the midpoint for two-column layout
         mid_point = (num_vars + 1) // 2
         col1_width = 0
-
-        # Calculate the width needed for the first column
         if num_vars > 0:
             try:
                 col1_width = max(len(Styles.strip_styles(k)) for k, _ in formatted_vars[:mid_point]) + 3
             except ValueError:
                 col1_width = 3
-
-        # Generate the two-column layout
         for i in range(mid_point):
-            # Format the first column
             key1, val1 = formatted_vars[i]
             key1_clean_len = len(Styles.strip_styles(key1))
             key1_padded = key1 + " " * max(0, col1_width - key1_clean_len - 3)
             line = f"  {key1_padded} {Styles.LocalsEquals('=')} {val1}"
-
-            # Add the second column if available
             j = i + mid_point
             if j < num_vars:
                 key2, val2 = formatted_vars[j]
                 line += f"    {Styles.LocalsKey(key2)} {Styles.LocalsEquals('=')} {val2}"
-
             lines.append(line)
-
         return lines
     def _format_syntax_error(self, error: _SyntaxError) -> Iterable[str]:
         """Format a syntax error for display.
@@ -1206,39 +1170,28 @@ if __name__ == "__main__":
     def inner_function(a, b):
         """Divide two numbers, will raise ZeroDivisionError if b is zero."""
         # These variables are intentionally defined to demonstrate locals display in the traceback
-        # They are not used in the function, but will appear in the traceback's locals section
-        # pylint: disable=unused-variable,pointless-statement
-        sample_dict = {"key": "value", "num": 123.45, "bool": True}  # noqa
-        sample_str = "abcdefghijklmnopqrstuvwxyz" * 5  # noqa
-        sample_none = None  # noqa
-        # pylint: enable=unused-variable,pointless-statement
+        sample_dict = {"key": "value", "num": 123.45, "bool": True}
+        sample_str = "abcdefghijklmnopqrstuvwxyz" * 5
+        sample_none = None
         return a / b
 
     def my_buggy_function(c):
         """A function with a bug that will cause an exception."""
         x = 10
         y = 0  # This will cause a division by zero
+        greeting = "hello world"
+        numbers = [10, 20, 30, None, list(range(8))]
+        data = {"one": 1, "two": None, "nested": {"a": 1, "b": 2}}
+        print("About to call inner function...")
+        result = inner_function(x * c, y)
+        print(f"Result was: {result}")
 
-        # More sample variables for demonstration in the traceback
-        # These are intentionally unused but will show up in the locals section
-        # pylint: disable=unused-variable,pointless-statement
-        greeting = "hello world"  # noqa
-        numbers = [10, 20, 30, None, list(range(8))]  # noqa
-        data = {"one": 1, "two": None, "nested": {"a": 1, "b": 2}}  # noqa
-        # pylint: enable=unused-variable,pointless-statement
-
-        print("About to call inner function...")  # This will print
-        result = inner_function(x * c, y)  # This will raise ZeroDivisionError
-        print(f"Result was: {result}")  # This won't execute
-
-    # Example 1: Simple exception
     print("\nExample 1: Simple exception\n")
     try:
         my_buggy_function(5)
     except ZeroDivisionError:
         print("\nCaught ZeroDivisionError as expected.\n")
 
-    # Example 2: Exception chaining with 'raise from'
     print("\nExample 2: Exception chaining with 'raise from'\n")
     try:
         try:
@@ -1255,5 +1208,4 @@ if __name__ == "__main__":
     # except SyntaxError:
     #     print("\nCaught SyntaxError as expected.\n")
 
-    # Uninstall the handler when done
     uninstall()
