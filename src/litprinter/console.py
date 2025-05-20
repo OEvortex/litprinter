@@ -40,7 +40,13 @@ def _parse_markup(text: str) -> str:
     return "".join(result)
 
 
-def cprint(*objects: Iterable, sep: str = " ", end: str = "\n", file=sys.stdout) -> None:
+def cprint(
+    *objects: Iterable,
+    sep: str = " ",
+    end: str = "\n",
+    file=sys.stdout,
+    flush: bool = False,
+) -> None:
     """Print objects with simple Rich-like markup support.
 
     Use syntax like ``[red]error[/red]`` or ``[bold]bold text[/bold]``. Unknown
@@ -48,5 +54,5 @@ def cprint(*objects: Iterable, sep: str = " ", end: str = "\n", file=sys.stdout)
     """
     text = sep.join(str(o) for o in objects)
     formatted = _parse_markup(text)
-    print(formatted, file=file, end=end)
+    print(formatted, file=file, end=end, flush=flush)
 
