@@ -8,7 +8,7 @@ from unittest import mock
 
 import pytest
 
-from litprinter import litprint, lit
+from litprinter import litprint, lit, cprint
 
 
 def test_litprint_basic():
@@ -54,4 +54,18 @@ def test_lit_basic():
         assert "LIT" in output
     finally:
         # Reset stdout
+        sys.stdout = sys.__stdout__
+
+
+def test_cprint_markup():
+    """Test the cprint function with simple markup."""
+    captured_output = io.StringIO()
+    sys.stdout = captured_output
+
+    try:
+        cprint("[red]Error[/red] message")
+        output = captured_output.getvalue()
+        assert "Error" in output
+        assert "\x1b[31m" in output  # red ANSI code
+    finally:
         sys.stdout = sys.__stdout__

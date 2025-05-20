@@ -43,6 +43,7 @@ from .core import LITPrintDebugger, argumentToString
 from .builtins import install, uninstall
 from .coloring import JARVIS, RICH, MODERN, NEON, CYBERPUNK, create_custom_style
 from . import traceback
+from .console import cprint
 
 __version__ = '0.2.0'
 
