@@ -44,6 +44,17 @@ from .builtins import install, uninstall
 from .coloring import JARVIS, RICH, MODERN, NEON, CYBERPUNK, create_custom_style
 from . import traceback
 from .console import *
+try:
+    from .panel import (
+        Panel, BorderStyle, Padding, Shadow, Background, TextOverflow,
+        BorderChars, RenderableType, Segment, BoxModel, PanelGroup,
+        panel, info_panel, warning_panel, error_panel, success_panel,
+        debug_panel, quote_panel, code_panel, highlight_panel, shadow_panel,
+        themed_panel, PANEL_THEMES
+    )
+except ImportError:
+    # Panel module may not be available in all environments
+    pass
 
 __version__ = '0.2.0'
 
