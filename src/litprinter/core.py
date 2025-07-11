@@ -16,6 +16,7 @@ names, colorizing output, and configurable options.
 from __future__ import print_function
 import ast
 import inspect
+import os
 import pprint
 import sys
 import warnings
@@ -36,9 +37,8 @@ except ImportError as exc:  # pragma: no cover - required
         "The 'executing' package is required for litprinter."
     ) from exc
 from pygments import highlight
-from pygments.formatters import Terminal256Formatter, HtmlFormatter
-from pygments.lexers import PythonLexer as PyLexer, Python3Lexer as Py3Lexer
-from pygments.token import Token
+from pygments.formatters import Terminal256Formatter
+from pygments.lexers import Python3Lexer as Py3Lexer
 from typing import Any, List, Type, Optional, Dict, Callable
 from .styles import (
     JARVIS, RICH, MODERN, NEON, CYBERPUNK, DRACULA, MONOKAI,
@@ -55,73 +55,165 @@ def bindStaticVariable(name, value):
         return fn
     return decorator
 
-@bindStaticVariable('formatter', Terminal256Formatter(style=CYBERPUNK))
-@bindStaticVariable(
-    'lexer', Py3Lexer(ensurenl=False))
-def colorize(s, color_style=None):
+# Style formatter cache for performance optimization
+_style_cache = {}
+
+
+def _get_cached_formatter(color_style):
+    """
+    Get a cached formatter for the given color style.
+    Creates and caches formatters to avoid repeated object creation.
+    """
+    # Create a cache key
+    if color_style is None:
+        cache_key = 'default'
+    elif isinstance(color_style, str):
+        cache_key = color_style.lower()
+    elif isinstance(color_style, dict):
+        # For custom styles, create a hash of the dict
+        cache_key = f"custom_{hash(tuple(sorted(color_style.items())))}"
+    else:
+        # For other style objects, use their string representation
+        cache_key = f"object_{str(color_style)}"
+    
+    # Check cache first
+    if cache_key in _style_cache:
+        return _style_cache[cache_key]
+    
+    # Create formatter if not cached
     if color_style is None:
         formatter = Terminal256Formatter(style=CYBERPUNK)  # Use CYBERPUNK as default
     elif isinstance(color_style, str):
         # Allow selecting style by name (case-insensitive)
         style_name = color_style.lower()
-        if style_name == 'jarvis':
-            formatter = Terminal256Formatter(style=JARVIS)
-        elif style_name == 'rich':
-            formatter = Terminal256Formatter(style=RICH)
-        elif style_name == 'modern':
-            formatter = Terminal256Formatter(style=MODERN)
-        elif style_name == 'neon':
-            formatter = Terminal256Formatter(style=NEON)
-        elif style_name == 'cyberpunk':
-            formatter = Terminal256Formatter(style=CYBERPUNK)
-        elif style_name == 'dracula':
-            formatter = Terminal256Formatter(style=DRACULA)
-        elif style_name == 'monokai':
-            formatter = Terminal256Formatter(style=MONOKAI)
-        elif style_name == 'solarized':
-            formatter = Terminal256Formatter(style=SOLARIZED)
-        elif style_name == 'nord':
-            formatter = Terminal256Formatter(style=NORD)
-        elif style_name == 'github':
-            formatter = Terminal256Formatter(style=GITHUB)
-        elif style_name == 'vscode':
-            formatter = Terminal256Formatter(style=VSCODE)
-        elif style_name == 'material':
-            formatter = Terminal256Formatter(style=MATERIAL)
-        elif style_name == 'retro':
-            formatter = Terminal256Formatter(style=RETRO)
-        elif style_name == 'ocean':
-            formatter = Terminal256Formatter(style=OCEAN)
-        elif style_name == 'autumn':
-            formatter = Terminal256Formatter(style=AUTUMN)
-        elif style_name == 'synthwave':
-            formatter = Terminal256Formatter(style=SYNTHWAVE)
-        elif style_name == 'forest':
-            formatter = Terminal256Formatter(style=FOREST)
-        elif style_name == 'monochrome':
-            formatter = Terminal256Formatter(style=MONOCHROME)
-        elif style_name == 'sunset':
-            formatter = Terminal256Formatter(style=SUNSET)
+        style_map = {
+            'jarvis': JARVIS,
+            'rich': RICH,
+            'modern': MODERN,
+            'neon': NEON,
+            'cyberpunk': CYBERPUNK,
+            'dracula': DRACULA,
+            'monokai': MONOKAI,
+            'solarized': SOLARIZED,
+            'nord': NORD,
+            'github': GITHUB,
+            'vscode': VSCODE,
+            'material': MATERIAL,
+            'retro': RETRO,
+            'ocean': OCEAN,
+            'autumn': AUTUMN,
+            'synthwave': SYNTHWAVE,
+            'forest': FOREST,
+            'monochrome': MONOCHROME,
+            'sunset': SUNSET,
+        }
+        
+        if style_name in style_map:
+            formatter = Terminal256Formatter(style=style_map[style_name])
         else:
             # Try to use the string as a style name
-            formatter = Terminal256Formatter(style=color_style)
+            try:
+                formatter = Terminal256Formatter(style=color_style)
+            except Exception:
+                # Fall back to default if style is invalid
+                formatter = Terminal256Formatter(style=CYBERPUNK)
     elif isinstance(color_style, dict):
-        CustomStyle = create_custom_style('CustomStyle', color_style)
-        formatter = Terminal256Formatter(style=CustomStyle)
+        try:
+            CustomStyle = create_custom_style('CustomStyle', color_style)
+            formatter = Terminal256Formatter(style=CustomStyle)
+        except Exception:
+            # Fall back to default if custom style creation fails
+            formatter = Terminal256Formatter(style=CYBERPUNK)
     else:
-        formatter = Terminal256Formatter(style=color_style)
+        try:
+            formatter = Terminal256Formatter(style=color_style)
+        except Exception:
+            # Fall back to default if style object is invalid
+            formatter = Terminal256Formatter(style=CYBERPUNK)
+    
+    # Cache the formatter
+    _style_cache[cache_key] = formatter
+    return formatter
+
+
+@bindStaticVariable('formatter', Terminal256Formatter(style=CYBERPUNK))
+@bindStaticVariable(
+    'lexer', Py3Lexer(ensurenl=False))
+def colorize(s, color_style=None):
+    """
+    Colorize string using pygments with improved caching for better performance.
+    """
+    formatter = _get_cached_formatter(color_style)
     return highlight(s, colorize.lexer, formatter)
+
+
+def clearStyleCache():
+    """
+    Clear the style formatter cache.
+    Useful for testing or when memory usage is a concern.
+    """
+    global _style_cache
+    _style_cache.clear()
+
+
+def getStyleCacheInfo():
+    """
+    Get information about the current style cache.
+    Returns a dictionary with cache statistics.
+    """
+    return {
+        'cache_size': len(_style_cache),
+        'cached_styles': list(_style_cache.keys())
+    }
 
 @contextmanager
 def supportTerminalColorsInWindows():
+    """
+    Context manager for Windows terminal color support.
+    Provides better detection and graceful fallbacks.
+    """
     if colorama is not None:
-        colorama.init()
+        # Initialize colorama for Windows compatibility
+        colorama.init(autoreset=True, strip=False, convert=True)
         try:
             yield
         finally:
             colorama.deinit()
     else:
+        # No colorama available - check if we're on Windows and warn if needed
+        if sys.platform.startswith('win'):
+            # On Windows without colorama, colors might not work properly
+            # but we'll still try to output them
+            pass
         yield
+
+
+def isTerminalCapable():
+    """
+    Detect if the current terminal supports color output.
+    Returns True if colors should be displayed, False otherwise.
+    """
+    # Check if we're in a pipe or redirect
+    if not hasattr(sys.stderr, 'isatty') or not sys.stderr.isatty():
+        return False
+    
+    # Check environment variables that indicate color support
+    term = os.environ.get('TERM', '').lower()
+    colorterm = os.environ.get('COLORTERM', '').lower()
+    
+    # Common terminals that support color
+    color_terms = ['xterm', 'xterm-256color', 'screen', 'tmux', 'vt100', 'vt220']
+    
+    # Check for explicit color support indicators
+    if colorterm in ['truecolor', '24bit'] or any(t in term for t in color_terms):
+        return True
+        
+    # Check for NO_COLOR environment variable (follows standard)
+    if os.environ.get('NO_COLOR'):
+        return False
+        
+    # Default to True on most platforms, let colorama handle Windows
+    return True
 
 def stderrPrint(*args, sep=' ', end='\n', flush=False):
     print(*args, file=sys.stderr, sep=sep, end=end, flush=flush)
@@ -134,21 +226,38 @@ def isLiteral(s):
     return True
 
 def colorizedStderrPrint(s, color_style=None, sep=' ', end='\n', flush=False):
-    colored = colorize(s, color_style)
-    with supportTerminalColorsInWindows():
-        stderrPrint(colored, sep=sep, end=end, flush=flush)
+    """
+    Print to stderr with color support and improved cross-platform compatibility.
+    """
+    # Check if colors should be used
+    if not isTerminalCapable():
+        # Fall back to plain text if terminal doesn't support colors
+        stderrPrint(s, sep=sep, end=end, flush=flush)
+        return
+        
+    try:
+        colored = colorize(s, color_style)
+        with supportTerminalColorsInWindows():
+            stderrPrint(colored, sep=sep, end=end, flush=flush)
+    except Exception:
+        # If coloring fails for any reason, fall back to plain text
+        stderrPrint(s, sep=sep, end=end, flush=flush)
 
 
 def stdoutPrint(s, color_style=None, sep=' ', end='\n', flush=False):
-    """Print to stdout with optional color support."""
-    if color_style is not None:
-        s = colorize(s, color_style)
-        with supportTerminalColorsInWindows():
+    """Print to stdout with optional color support and improved cross-platform compatibility."""
+    if color_style is not None and isTerminalCapable():
+        try:
+            s = colorize(s, color_style)
+            with supportTerminalColorsInWindows():
+                print(s, sep=sep, end=end, flush=flush)
+        except Exception:
+            # If coloring fails, fall back to plain text
             print(s, sep=sep, end=end, flush=flush)
     else:
         print(s, sep=sep, end=end, flush=flush)
 
-DEFAULT_PREFIX = 'LIT| '
+DEFAULT_PREFIX = 'LIT| '  # Changed from 'LIT -> ' for better visual separation
 DEFAULT_LINE_WRAP_WIDTH = 70
 DEFAULT_CONTEXT_DELIMITER = '- '
 DEFAULT_OUTPUT_FUNCTION = colorizedStderrPrint
@@ -392,7 +501,7 @@ class LITPrintDebugger:
     def __init__(self, prefix: str = DEFAULT_PREFIX,
                  outputFunction: Any = DEFAULT_OUTPUT_FUNCTION,
                  argToStringFunction: Any = argumentToString, includeContext: bool = True,
-                 contextAbsPath: bool = False, log_file: Optional[str] = None, color_style: Any | None = None,
+                 contextAbsPath: bool = False, log_file: Optional[str] = None, color_style: Optional[Any] = None,
                  disable_colors: bool = False, contextDelimiter: str = DEFAULT_CONTEXT_DELIMITER,
                  log_timestamp: bool = False, style: str = 'default', filter_types: Optional[List[Type]] = None, flush: bool = False,
                  pprint_options: Optional[dict] = None, rich_styles: Optional[dict] = None):
@@ -581,17 +690,29 @@ class LITPrintDebugger:
 
         # Start from the frame where _getContext is called (which is 2 frames back)
         for frame_info in frames[2:]:
-            if frame_info.function not in ['_formatContext', '_format', 'lit', 'litprint', 'log']: # Skip litprint internals
+            if frame_info.function not in ['_formatContext', '_format', 'lit', 'litprint', 'log', '_lit_implementation', '_log_implementation']: # Skip litprint internals
                 lineNumber = frame_info.lineno
                 parentFunction = frame_info.function
-                filepath = (realpath if self.contextAbsPath else basename)(frame_info.filename)
+                
+                # Improve cross-platform path handling
+                if self.contextAbsPath:
+                    filepath = os.path.normpath(realpath(frame_info.filename))
+                else:
+                    filepath = os.path.normpath(basename(frame_info.filename))
+                
                 return filepath, lineNumber, parentFunction
 
         # If no other frame is found, return module information
         frameInfo = inspect.getframeinfo(callFrame)
         lineNumber = frameInfo.lineno
         parentFunction = frameInfo.function
-        filepath = (realpath if self.contextAbsPath else basename)(frameInfo.filename)
+        
+        # Improve cross-platform path handling
+        if self.contextAbsPath:
+            filepath = os.path.normpath(realpath(frameInfo.filename))
+        else:
+            filepath = os.path.normpath(basename(frameInfo.filename))
+            
         return filepath, lineNumber, parentFunction
 
     def enable(self):

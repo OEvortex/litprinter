@@ -1,7 +1,7 @@
 """
 MONOKAI Style - A classic dark theme known for its vibrant green, pink, and blue colors.
 """
-from litprinter.styles.base import (
+from .base import (
     Style, Text, Name, Error, Other, String, Number, Keyword, Generic, Literal,
     Comment, Operator, Whitespace, Punctuation
 )

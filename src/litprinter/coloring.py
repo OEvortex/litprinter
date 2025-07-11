@@ -35,7 +35,7 @@ Available themes:
 """
 
 # Import all styles and the custom style creator from the styles package
-from litprinter.styles import (
+from .styles import (
     JARVIS, RICH, MODERN, NEON, CYBERPUNK, DRACULA, MONOKAI, SOLARIZED, NORD,
     GITHUB, VSCODE, MATERIAL, RETRO, OCEAN, AUTUMN, SYNTHWAVE, FOREST, MONOCHROME,
     SUNSET, create_custom_style

@@ -1,7 +1,7 @@
 """
 FOREST Style - A theme with various shades of green and brown, inspired by forests.
 """
-from litprinter.styles.base import (
+from .base import (
     Style, Text, Name, Error, Other, String, Number, Keyword, Generic, Literal,
     Comment, Operator, Whitespace, Punctuation
 )

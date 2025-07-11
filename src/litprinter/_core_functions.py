@@ -1,24 +1,13 @@
 """
->>> from litprinter import litprint
->>>
->>> litprint("Hello, world!")
-LIT -> [__main__.py:3] in () >>> Hello, world!
->>>
->>> def my_function(a, b):
-...    litprint(a, b)
->>> my_function(1, 2)
-LIT -> [__main__.py:6] in my_function() >>> a: 1, b: 2
-
-This module provides the 'litprint' function, which is an enhanced print function for
-debugging purposes. It leverages the LITPrintDebugger class from 'core.py' and allows
-for configurable prefix, output functions, and context inclusion. It's designed
-to make debugging more straightforward by offering clear output with context information.
+Core implementation for lit and litprint functions.
+This module contains the shared logic to avoid code duplication.
 """
-from ._core_functions import _lit_implementation, _log_implementation
+import inspect
+from .core import LITPrintDebugger, argumentToString, DEFAULT_PREFIX
 from typing import Any, List, Type, Optional
 
 
-def litprint(
+def _lit_implementation(
     *args,
     prefix: Optional[str] = None,
     outputFunction: Optional[Any] = None,
@@ -40,6 +29,8 @@ def litprint(
     **kwargs
 ):
     """
+    Core implementation for lit and litprint functions.
+    
     Prints the given arguments with enhanced formatting and debugging capabilities.
 
     Args:
@@ -66,11 +57,11 @@ def litprint(
     Returns:
         The arguments passed to the function, allowing it to be used inline in expressions.
     """
-    return _lit_implementation(
-        *args,
-        prefix=prefix,
+    debugger = LITPrintDebugger(
+        **kwargs,
+        prefix=prefix if prefix is not None else DEFAULT_PREFIX,
         outputFunction=outputFunction,
-        argToStringFunction=argToStringFunction,
+        argToStringFunction=argToStringFunction if argToStringFunction is not None else argumentToString,
         includeContext=includeContext,
         contextAbsPath=contextAbsPath,
         log_file=log_file,
@@ -78,18 +69,40 @@ def litprint(
         disable_colors=disable_colors,
         contextDelimiter=contextDelimiter,
         log_timestamp=log_timestamp,
-        sep=sep,
-        end=end,
         style=style,
         filter_types=filter_types,
         flush=flush,
         pprint_options=pprint_options,
-        rich_styles=rich_styles,
-        **kwargs
+        rich_styles=rich_styles
     )
+    
+    # Return the arguments for easy integration into existing code
+    if not args:
+        return None
+    elif len(args) == 1:
+        passthrough = args[0]
+    else:
+        passthrough = args
+        
+    # Format and output
+    # We need to go two frames back: one for this function, one for the wrapper function
+    call_frame = inspect.currentframe().f_back.f_back
+    formatted_output = debugger._format(call_frame, *args)
+    
+    if debugger.disable_colors:
+        from .core import stderrPrint
+        stderrPrint(formatted_output, sep=sep, end=end, flush=flush)
+    else:
+        if debugger.outputFunction is print:
+            from .core import stdoutPrint
+            stdoutPrint(formatted_output, debugger.color_style, sep=sep, end=end, flush=flush)
+        else:
+            debugger.outputFunction(formatted_output, debugger.color_style, sep=sep, end=end, flush=flush)
+        
+    return passthrough
 
 
-def log(
+def _log_implementation(
     *args,
     level: str = "debug",
     prefix: Optional[str] = None,
@@ -112,6 +125,8 @@ def log(
     **kwargs
 ):
     """
+    Core implementation for logging functions.
+    
     Logs the given arguments with enhanced formatting and debugging capabilities.
 
     Args:
@@ -139,12 +154,11 @@ def log(
     Returns:
         The arguments passed to the function, allowing it to be used inline in expressions.
     """
-    return _log_implementation(
-        *args,
-        level=level,
-        prefix=prefix,
+    debugger = LITPrintDebugger(
+        **kwargs,
+        prefix=prefix if prefix is not None else f"[{level.upper()}] " + DEFAULT_PREFIX,
         outputFunction=outputFunction,
-        argToStringFunction=argToStringFunction,
+        argToStringFunction=argToStringFunction if argToStringFunction is not None else argumentToString,
         includeContext=includeContext,
         contextAbsPath=contextAbsPath,
         log_file=log_file,
@@ -152,12 +166,34 @@ def log(
         disable_colors=disable_colors,
         contextDelimiter=contextDelimiter,
         log_timestamp=log_timestamp,
-        sep=sep,
-        end=end,
         style=style,
         filter_types=filter_types,
         flush=flush,
         pprint_options=pprint_options,
-        rich_styles=rich_styles,
-        **kwargs
+        rich_styles=rich_styles
     )
+    
+    # Return the arguments for easy integration into existing code
+    if not args:
+        return None
+    elif len(args) == 1:
+        passthrough = args[0]
+    else:
+        passthrough = args
+        
+    # Format and output
+    # We need to go two frames back: one for this function, one for the wrapper function
+    call_frame = inspect.currentframe().f_back.f_back
+    formatted_output = debugger._format(call_frame, *args)
+    
+    if debugger.disable_colors:
+        from .core import stderrPrint
+        stderrPrint(formatted_output, sep=sep, end=end, flush=flush)
+    else:
+        if debugger.outputFunction is print:
+            from .core import stdoutPrint
+            stdoutPrint(formatted_output, debugger.color_style, sep=sep, end=end, flush=flush)
+        else:
+            debugger.outputFunction(formatted_output, debugger.color_style, sep=sep, end=end, flush=flush)
+        
+    return passthrough

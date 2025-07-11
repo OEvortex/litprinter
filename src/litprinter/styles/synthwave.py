@@ -1,7 +1,7 @@
 """
 SYNTHWAVE Style - A retro 80s-inspired theme with neon purples and blues.
 """
-from litprinter.styles.base import (
+from .base import (
     Style, Text, Name, Error, Other, String, Number, Keyword, Generic, Literal,
     Comment, Operator, Whitespace, Punctuation
 )

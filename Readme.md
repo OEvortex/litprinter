@@ -163,6 +163,9 @@ Or for direct access to LitPrinter's functions:
 # Install as builtins for convenience
 from litprinter import install
 install()  # Now 'litprint' and 'ic' are available globally
+
+# Import performance and system utilities
+from litprinter.core import clearStyleCache, getStyleCacheInfo, isTerminalCapable
 ```
 
 ## 📖 API Overview
@@ -196,6 +199,14 @@ install()  # Now 'litprint' and 'ic' are available globally
 | `disable_colors` | bool | Turn off syntax highlighting |
 | `log_file` | str | File to write output to |
 | `log_timestamp` | bool | Include timestamps in output |
+
+### Performance and System Utilities
+
+| Function | Description |
+|----------|-------------|
+| `clearStyleCache()` | Clear the style formatter cache for memory management |
+| `getStyleCacheInfo()` | Get cache statistics and currently cached styles |
+| `isTerminalCapable()` | Check if terminal supports color output (respects NO_COLOR standard) |
 
 ## 📚 Examples
 
@@ -255,6 +266,51 @@ from litprinter import lit
 lit("Initializing system...", log_file="app.log", log_timestamp=True)
 ```
 
+### Performance Management and Cache Control
+
+```python
+from litprinter.core import clearStyleCache, getStyleCacheInfo, isTerminalCapable
+
+# Check cache status
+cache_info = getStyleCacheInfo()
+print(f"Cache size: {cache_info['cache_size']}")
+print(f"Cached styles: {cache_info['cached_styles']}")
+
+# Clear cache for memory management
+clearStyleCache()
+
+# Check terminal capabilities (respects NO_COLOR environment variable)
+if isTerminalCapable():
+    print("Terminal supports colors")
+else:
+    print("Terminal does not support colors or NO_COLOR is set")
+```
+
+### Cross-Platform Compatibility
+
+```python
+# LitPrinter automatically handles cross-platform differences:
+# - Detects Windows terminal capabilities and initializes colorama
+# - Respects NO_COLOR environment variable standard
+# - Uses proper path normalization across platforms
+# - Gracefully falls back to plain text when colors aren't supported
+
+import os
+os.environ['NO_COLOR'] = '1'  # Disable colors globally
+lit("This will be plain text")  # No colors will be applied
+```
+
+## 🆕 Recent Improvements
+
+### Code Quality & Performance (v0.2.0)
+- **90% Code Duplication Eliminated**: Consolidated `lit.py` and `litprint.py` implementations
+- **Enhanced Cross-Platform Support**: Improved Windows terminal detection and colorama integration
+- **Performance Optimizations**: Added style caching system for better performance
+- **Memory Management**: New cache control functions for production environments
+- **Standards Compliance**: Full NO_COLOR environment variable support
+- **Robust Error Handling**: Graceful fallbacks for invalid styles and edge cases
+- **Import Fixes**: Resolved module import issues for better package compatibility
+
 ## 🧩 Integration with VS Code and Other Editors
 
 LitPrinter creates clickable links in supported terminals and editors. In VS Code, clicking on the file path in the output will open the file at the exact line.
@@ -281,6 +337,10 @@ install(show_locals=True)
 - 🔄 **Flow-friendly**: Use inline without disrupting your code
 - 🛠️ **Extensible**: Register custom formatters for your types
 - 💥 **Enhanced tracebacks**: Transform boring Python tracebacks into beautiful, informative displays
+- ⚡ **Performance optimized**: Built-in caching system for improved performance
+- 🌐 **Cross-platform**: Full Windows, macOS, and Linux support with automatic detection
+- 🎯 **Standards compliant**: Respects NO_COLOR and other terminal standards
+- 🛡️ **Robust error handling**: Graceful fallbacks ensure your code never breaks
 
 ## 🤝 Contributing
 

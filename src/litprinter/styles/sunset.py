@@ -1,7 +1,7 @@
 """
 SUNSET Style - A warm theme with oranges, reds, and purples reminiscent of a sunset.
 """
-from litprinter.styles.base import (
+from .base import (
     Style, Text, Name, Error, Other, String, Number, Keyword, Generic, Literal,
     Comment, Operator, Whitespace, Punctuation
 )
