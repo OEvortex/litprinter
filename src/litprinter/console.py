@@ -1,6 +1,7 @@
 import builtins
 import re
 import sys
+from textwrap import indent
 from typing import Iterable, List
 from .colors import Colors
 
@@ -57,7 +58,7 @@ def cprint(
     # Convert slice objects to string representation for compatibility with print
     text = sep.join(str(o) if not isinstance(o, slice) else str(o) for o in objects)
     formatted = _parse_markup(text)
-    builtins.print(formatted, file=file, end=end, flush=flush)
+    builtins.print(indent(formatted, "  "), file=file, end=end, flush=flush)
 
 
 def print(*args, **kwargs):
