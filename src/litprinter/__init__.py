@@ -37,11 +37,11 @@ with additional features:
 - Smart object introspection for custom classes
 - Logging capabilities with timestamp and log levels
 """
-from .litprint import litprint, log
-from .lit import lit, log, ic
-from .core import LITPrintDebugger, argumentToString
+from .litprint import litprint
+from .lit import lit
+from .core import LitPrintDebugger, argumentToString
 from .builtins import install, uninstall
-from .coloring import JARVIS, RICH, MODERN, NEON, CYBERPUNK, create_custom_style
+from .coloring import SolarizedDark
 from . import traceback
 from .console import *
 try:
@@ -59,5 +59,5 @@ except ImportError:
 __version__ = '0.2.0'
 
 # For compatibility with icecream
-enable = LITPrintDebugger.enable_globally
-disable = LITPrintDebugger.disable_globally
+enable = LitPrintDebugger.enable if hasattr(LitPrintDebugger, 'enable') else None
+disable = LitPrintDebugger.disable if hasattr(LitPrintDebugger, 'disable') else None
