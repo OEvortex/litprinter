@@ -1,49 +1,114 @@
-"""
->>> from litprinter.coloring import JARVIS
->>>
->>> print(JARVIS.styles)
-{<Token.Text: 0>: '#ffffff', <Token.Whitespace: 1>: '#222222', <Token.Error: 2>: '#ff0000', ...}
->>> from litprinter.coloring import create_custom_style
->>> colors = {<Token.Text>: "#ff00ff"}
->>> custom_style = create_custom_style("MyCustomStyle", colors)
->>> print(custom_style.styles)
-{<Token.Text: 0>: '#ff00ff'}
+# -*- coding: utf-8 -*-
 
-This module defines color styles for the output of the litprint and lit functions.
-It includes several predefined color schemes and the ability to create custom styles.
+#
+# LitPrinter - Never use print() to debug again
+#
+# License: MIT
+#
 
-Available themes:
-- JARVIS: A Tron-inspired theme with black background and vibrant cyan/green/magenta highlights
-- RICH: Inspired by the Rich library's default theme
-- MODERN: A high-contrast dark theme with blues, purples, and greens
-- NEON: Extremely bright, high-contrast colors on a black background
-- CYBERPUNK: Dark blue/purple background with neon pink, blue, and green highlights
-- DRACULA: A popular dark theme with a distinct purple and cyan palette
-- MONOKAI: A classic dark theme known for its vibrant green, pink, and blue colors
-- SOLARIZED: Based on the popular Solarized color scheme with its distinctive palette
-- NORD: Based on the Nord color scheme with its arctic, bluish colors
-- GITHUB: Based on GitHub's light theme for a familiar look
-- VSCODE: Based on VS Code's default dark theme
-- MATERIAL: Based on Material Design colors for a modern look
-- RETRO: A retro computing theme with amber/green on black
-- OCEAN: A calming blue-based theme
-- AUTUMN: A warm theme with autumn colors
-- SYNTHWAVE: A retro 80s-inspired theme with neon purples and blues
-- FOREST: A nature-inspired theme with various shades of green
-- MONOCHROME: A minimalist black and white theme with high contrast
-- SUNSET: A warm theme with sunset colors (oranges, reds, and purples)
-"""
+from pygments.style import Style
+from pygments.token import (
+    Text, Name, Error, Other, String, Number, Keyword, Generic, Literal,
+    Comment, Operator, Whitespace, Punctuation)
 
-# Import all styles and the custom style creator from the styles package
-from .styles import (
-    JARVIS, RICH, MODERN, NEON, CYBERPUNK, DRACULA, MONOKAI, SOLARIZED, NORD,
-    GITHUB, VSCODE, MATERIAL, RETRO, OCEAN, AUTUMN, SYNTHWAVE, FOREST, MONOCHROME,
-    SUNSET, create_custom_style
-)
 
-# Re-export everything for backward compatibility
-__all__ = [
-    'JARVIS', 'RICH', 'MODERN', 'NEON', 'CYBERPUNK', 'DRACULA', 'MONOKAI',
-    'SOLARIZED', 'NORD', 'GITHUB', 'VSCODE', 'MATERIAL', 'RETRO', 'OCEAN',
-    'AUTUMN', 'SYNTHWAVE', 'FOREST', 'MONOCHROME', 'SUNSET', 'create_custom_style'
-]
+# Solarized: https://ethanschoonover.com/solarized/
+class SolarizedDark(Style):
+
+    BASE03  = '#002b36' # noqa
+    BASE02  = '#073642' # noqa
+    BASE01  = '#586e75' # noqa
+    BASE00  = '#657b83' # noqa
+    BASE0   = '#839496' # noqa
+    BASE1   = '#93a1a1' # noqa
+    BASE2   = '#eee8d5' # noqa
+    BASE3   = '#fdf6e3' # noqa
+    YELLOW  = '#b58900' # noqa
+    ORANGE  = '#cb4b16' # noqa
+    RED     = '#dc322f' # noqa
+    MAGENTA = '#d33682' # noqa
+    VIOLET  = '#6c71c4' # noqa
+    BLUE    = '#268bd2' # noqa
+    CYAN    = '#2aa198' # noqa
+    GREEN   = '#859900' # noqa
+
+    styles = {
+        Text:                   BASE0,
+        Whitespace:             BASE03,
+        Error:                  RED,
+        Other:                  BASE0,
+
+        Name:                   BASE1,
+        Name.Attribute:         BASE0,
+        Name.Builtin:           BLUE,
+        Name.Builtin.Pseudo:    BLUE,
+        Name.Class:             BLUE,
+        Name.Constant:          YELLOW,
+        Name.Decorator:         ORANGE,
+        Name.Entity:            ORANGE,
+        Name.Exception:         ORANGE,
+        Name.Function:          BLUE,
+        Name.Property:          BLUE,
+        Name.Label:             BASE0,
+        Name.Namespace:         YELLOW,
+        Name.Other:             BASE0,
+        Name.Tag:               GREEN,
+        Name.Variable:          ORANGE,
+        Name.Variable.Class:    BLUE,
+        Name.Variable.Global:   BLUE,
+        Name.Variable.Instance: BLUE,
+
+        String:                 CYAN,
+        String.Backtick:        CYAN,
+        String.Char:            CYAN,
+        String.Doc:             CYAN,
+        String.Double:          CYAN,
+        String.Escape:          ORANGE,
+        String.Heredoc:         CYAN,
+        String.Interpol:        ORANGE,
+        String.Other:           CYAN,
+        String.Regex:           CYAN,
+        String.Single:          CYAN,
+        String.Symbol:          CYAN,
+
+        Number:                 CYAN,
+        Number.Float:           CYAN,
+        Number.Hex:             CYAN,
+        Number.Integer:         CYAN,
+        Number.Integer.Long:    CYAN,
+        Number.Oct:             CYAN,
+
+        Keyword:                GREEN,
+        Keyword.Constant:       GREEN,
+        Keyword.Declaration:    GREEN,
+        Keyword.Namespace:      ORANGE,
+        Keyword.Pseudo:         ORANGE,
+        Keyword.Reserved:       GREEN,
+        Keyword.Type:           GREEN,
+
+        Generic:                BASE0,
+        Generic.Deleted:        BASE0,
+        Generic.Emph:           BASE0,
+        Generic.Error:          BASE0,
+        Generic.Heading:        BASE0,
+        Generic.Inserted:       BASE0,
+        Generic.Output:         BASE0,
+        Generic.Prompt:         BASE0,
+        Generic.Strong:         BASE0,
+        Generic.Subheading:     BASE0,
+        Generic.Traceback:      BASE0,
+
+        Literal:                BASE0,
+        Literal.Date:           BASE0,
+
+        Comment:                BASE01,
+        Comment.Multiline:      BASE01,
+        Comment.Preproc:        BASE01,
+        Comment.Single:         BASE01,
+        Comment.Special:        BASE01,
+
+        Operator:               BASE0,
+        Operator.Word:          GREEN,
+
+        Punctuation:            BASE0,
+    }

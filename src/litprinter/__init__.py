@@ -37,27 +37,28 @@ with additional features:
 - Smart object introspection for custom classes
 - Logging capabilities with timestamp and log levels
 """
-from .litprint import litprint, log
-from .lit import lit, log, ic
-from .core import LITPrintDebugger, argumentToString
+from .litprint import litprint
+from .lit import lit
+from .core import LitPrintDebugger, argumentToString
 from .builtins import install, uninstall
-from .coloring import JARVIS, RICH, MODERN, NEON, CYBERPUNK, create_custom_style
-from . import traceback
-from .console import *
-try:
-    from .panel import (
-        Panel, BorderStyle, Padding, Shadow, Background, TextOverflow,
-        BorderChars, RenderableType, Segment, BoxModel, PanelGroup,
-        panel, info_panel, warning_panel, error_panel, success_panel,
-        debug_panel, quote_panel, code_panel, highlight_panel, shadow_panel,
-        themed_panel, PANEL_THEMES
-    )
-except ImportError:
-    # Panel module may not be available in all environments
-    pass
+from .coloring import SolarizedDark
+# from . import traceback  # Removed complex traceback module
+# from .console import *  # Removed complex console module
+# Panel functionality removed - not part of icecream-like interface
+# try:
+#     from .panel import (
+#         Panel, BorderStyle, Padding, Shadow, Background, TextOverflow,
+#         BorderChars, RenderableType, Segment, BoxModel, PanelGroup,
+#         panel, info_panel, warning_panel, error_panel, success_panel,
+#         debug_panel, quote_panel, code_panel, highlight_panel, shadow_panel,
+#         themed_panel, PANEL_THEMES
+#     )
+# except ImportError:
+#     # Panel module may not be available in all environments
+#     pass
 
 __version__ = '0.2.0'
 
 # For compatibility with icecream
-enable = LITPrintDebugger.enable_globally
-disable = LITPrintDebugger.disable_globally
+enable = LitPrintDebugger.enable if hasattr(LitPrintDebugger, 'enable') else None
+disable = LitPrintDebugger.disable if hasattr(LitPrintDebugger, 'disable') else None
