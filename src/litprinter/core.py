@@ -14,19 +14,20 @@ names, colorizing output, and configurable options.
 """
 #!/usr/bin/env python
 from __future__ import print_function
-import ast
-import inspect
-import os
-import pprint
-import sys
-import warnings
 from datetime import datetime
-import functools
 from contextlib import contextmanager
 from os.path import basename, realpath
 from textwrap import dedent
+import ast
+import inspect
+import pprint
+import sys
+import warnings
+import functools
+import json
+
 try:
-    import colorama  # type: ignore
+    import colorama
 except ImportError:  # pragma: no cover - optional dependency
     colorama = None
 
@@ -38,14 +39,9 @@ except ImportError as exc:  # pragma: no cover - required
     ) from exc
 from pygments import highlight
 from pygments.formatters import Terminal256Formatter
-from pygments.lexers import Python3Lexer as Py3Lexer
+from pygments.lexers import PythonLexer as PyLexer, Python3Lexer as Py3Lexer
 from typing import Any, List, Type, Optional, Dict, Callable
-from .styles import (
-    JARVIS, RICH, MODERN, NEON, CYBERPUNK, DRACULA, MONOKAI,
-    SOLARIZED, NORD, GITHUB, VSCODE, MATERIAL, RETRO, OCEAN, AUTUMN,
-    SYNTHWAVE, FOREST, MONOCHROME, SUNSET, create_custom_style
-)
-import json
+from .coloring import CyberpunkStyle
 
 _absent = object()
 
@@ -55,168 +51,21 @@ def bindStaticVariable(name, value):
         return fn
     return decorator
 
-# Style formatter cache for performance optimization
-_style_cache = {}
-
-
-def _get_cached_formatter(color_style):
-    """
-    Get a cached formatter for the given color style.
-    Creates and caches formatters to avoid repeated object creation.
-    """
-    # Create a cache key
-    if color_style is None:
-        cache_key = 'default'
-    elif isinstance(color_style, str):
-        cache_key = color_style.lower()
-    elif isinstance(color_style, dict):
-        # For custom styles, create a hash of the dict
-        cache_key = f"custom_{hash(tuple(sorted(color_style.items())))}"
-    else:
-        # For other style objects, use their string representation
-        cache_key = f"object_{str(color_style)}"
-    
-    # Check cache first
-    if cache_key in _style_cache:
-        return _style_cache[cache_key]
-    
-    # Create formatter if not cached
-    if color_style is None:
-        formatter = Terminal256Formatter(style=CYBERPUNK)  # Use CYBERPUNK as default
-    elif isinstance(color_style, str):
-        # Allow selecting style by name (case-insensitive)
-        style_name = color_style.lower()
-        style_map = {
-            'jarvis': JARVIS,
-            'rich': RICH,
-            'modern': MODERN,
-            'neon': NEON,
-            'cyberpunk': CYBERPUNK,
-            'dracula': DRACULA,
-            'monokai': MONOKAI,
-            'solarized': SOLARIZED,
-            'nord': NORD,
-            'github': GITHUB,
-            'vscode': VSCODE,
-            'material': MATERIAL,
-            'retro': RETRO,
-            'ocean': OCEAN,
-            'autumn': AUTUMN,
-            'synthwave': SYNTHWAVE,
-            'forest': FOREST,
-            'monochrome': MONOCHROME,
-            'sunset': SUNSET,
-        }
-        
-        if style_name in style_map:
-            formatter = Terminal256Formatter(style=style_map[style_name])
-        else:
-            # Try to use the string as a style name
-            try:
-                formatter = Terminal256Formatter(style=color_style)
-            except Exception:
-                # Fall back to default if style is invalid
-                formatter = Terminal256Formatter(style=CYBERPUNK)
-    elif isinstance(color_style, dict):
-        try:
-            CustomStyle = create_custom_style('CustomStyle', color_style)
-            formatter = Terminal256Formatter(style=CustomStyle)
-        except Exception:
-            # Fall back to default if custom style creation fails
-            formatter = Terminal256Formatter(style=CYBERPUNK)
-    else:
-        try:
-            formatter = Terminal256Formatter(style=color_style)
-        except Exception:
-            # Fall back to default if style object is invalid
-            formatter = Terminal256Formatter(style=CYBERPUNK)
-    
-    # Cache the formatter
-    _style_cache[cache_key] = formatter
-    return formatter
-
-
-@bindStaticVariable('formatter', Terminal256Formatter(style=CYBERPUNK))
+@bindStaticVariable('formatter', Terminal256Formatter(style=CyberpunkStyle))
 @bindStaticVariable(
     'lexer', Py3Lexer(ensurenl=False))
-def colorize(s, color_style=None):
-    """
-    Colorize string using pygments with improved caching for better performance.
-    """
-    formatter = _get_cached_formatter(color_style)
-    return highlight(s, colorize.lexer, formatter)
-
-
-def clearStyleCache():
-    """
-    Clear the style formatter cache.
-    Useful for testing or when memory usage is a concern.
-    """
-    global _style_cache
-    _style_cache.clear()
-
-
-def getStyleCacheInfo():
-    """
-    Get information about the current style cache.
-    Returns a dictionary with cache statistics.
-    """
-    return {
-        'cache_size': len(_style_cache),
-        'cached_styles': list(_style_cache.keys())
-    }
+def colorize(s):
+    self = colorize
+    return highlight(s, self.lexer, self.formatter)
 
 @contextmanager
 def supportTerminalColorsInWindows():
-    """
-    Context manager for Windows terminal color support.
-    Provides better detection and graceful fallbacks.
-    """
-    if colorama is not None:
-        # Initialize colorama for Windows compatibility
-        colorama.init(autoreset=True, strip=False, convert=True)
-        try:
-            yield
-        finally:
-            colorama.deinit()
-    else:
-        # No colorama available - check if we're on Windows and warn if needed
-        if sys.platform.startswith('win'):
-            # On Windows without colorama, colors might not work properly
-            # but we'll still try to output them
-            pass
-        yield
+    colorama.init()
+    yield
+    colorama.deinit()
 
-
-def isTerminalCapable():
-    """
-    Detect if the current terminal supports color output.
-    Returns True if colors should be displayed, False otherwise.
-    """
-    # Check if we're in a pipe or redirect
-    if not hasattr(sys.stderr, 'isatty') or not sys.stderr.isatty():
-        return False
-    
-    # Check environment variables that indicate color support
-    term = os.environ.get('TERM', '').lower()
-    colorterm = os.environ.get('COLORTERM', '').lower()
-    
-    # Common terminals that support color
-    color_terms = ['xterm', 'xterm-256color', 'screen', 'tmux', 'vt100', 'vt220']
-    
-    # Check for explicit color support indicators
-    if colorterm in ['truecolor', '24bit'] or any(t in term for t in color_terms):
-        return True
-        
-    # Check for NO_COLOR environment variable (follows standard)
-    if os.environ.get('NO_COLOR'):
-        return False
-        
-    # Default to True on most platforms, let colorama handle Windows
-    return True
-
-def stderrPrint(*args, sep=' ', end='\n', flush=False):
-    print(*args, file=sys.stderr, sep=sep, end=end, flush=flush)
+def stderrPrint(*args):
+    print(*args, file=sys.stderr)
 
 def isLiteral(s):
     try:
@@ -225,39 +74,17 @@ def isLiteral(s):
         return False
     return True
 
-def colorizedStderrPrint(s, color_style=None, sep=' ', end='\n', flush=False):
-    """
-    Print to stderr with color support and improved cross-platform compatibility.
-    """
-    # Check if colors should be used
-    if not isTerminalCapable():
-        # Fall back to plain text if terminal doesn't support colors
-        stderrPrint(s, sep=sep, end=end, flush=flush)
-        return
-        
-    try:
-        colored = colorize(s, color_style)
-        with supportTerminalColorsInWindows():
-            stderrPrint(colored, sep=sep, end=end, flush=flush)
-    except Exception:
-        # If coloring fails for any reason, fall back to plain text
-        stderrPrint(s, sep=sep, end=end, flush=flush)
+def colorizedStderrPrint(s):
+    colored = colorize(s)
+    with supportTerminalColorsInWindows():
+        stderrPrint(colored)
 
+def styledLitPrint(s):
+    colored = colorize(s)
+    with supportTerminalColorsInWindows():
+        stderrPrint(colored)
 
-def stdoutPrint(s, color_style=None, sep=' ', end='\n', flush=False):
-    """Print to stdout with optional color support and improved cross-platform compatibility."""
-    if color_style is not None and isTerminalCapable():
-        try:
-            s = colorize(s, color_style)
-            with supportTerminalColorsInWindows():
-                print(s, sep=sep, end=end, flush=flush)
-        except Exception:
-            # If coloring fails, fall back to plain text
-            print(s, sep=sep, end=end, flush=flush)
-    else:
-        print(s, sep=sep, end=end, flush=flush)
-
-DEFAULT_PREFIX = 'LIT| '  # Changed from 'LIT -> ' for better visual separation
+DEFAULT_PREFIX = 'LIT| '
 DEFAULT_LINE_WRAP_WIDTH = 70
 DEFAULT_CONTEXT_DELIMITER = '- '
 DEFAULT_OUTPUT_FUNCTION = colorizedStderrPrint
@@ -299,19 +126,14 @@ def formatPair(prefix, arg, value):
     else:
         argLines = prefixFirstLineIndentRemaining(prefix, arg)
         valuePrefix = argLines[-1] + ': '
+
     looksLikeAString = (value[0] + value[-1]) in ["''", '""']
     if looksLikeAString:
         valueLines = prefixLines(' ', value, startAtLine=1)
         value = '\n'.join(valueLines)
-    if isinstance(value, str) and len(value) > LITPrintDebugger.lineWrapWidth:
-        valueLines = []
-        for i in range(0, len(value), LITPrintDebugger.lineWrapWidth):
-            valueLines.extend(prefixFirstLineIndentRemaining(valuePrefix, value[i:i+LITPrintDebugger.lineWrapWidth]))
-            valuePrefix = ' ' * len(valuePrefix)
-        lines = argLines[:-1] + valueLines
-    else:
-        valueLines = prefixFirstLineIndentRemaining(valuePrefix, value)
-        lines = argLines[:-1] + valueLines
+
+    valueLines = prefixFirstLineIndentRemaining(valuePrefix, value)
+    lines = argLines[:-1] + valueLines
     return '\n'.join(lines)
 
 def singledispatch(func):
@@ -327,82 +149,177 @@ def singledispatch(func):
     return func
 
 @singledispatch
-def argumentToString(obj, **kwargs):
-    """
-    Convert an object to a string representation.
-    This function can be extended for custom types using the register decorator.
+def argumentToString(obj):
+    s = DEFAULT_ARG_TO_STRING_FUNCTION(obj)
+    s = s.replace('\\n', '\n')
+    return s
 
-    Example:
-    @argumentToString.register(numpy.ndarray)
-    def _(obj):
-        return f"ndarray, shape={obj.shape}, dtype={obj.dtype}"
-    """
-    if isinstance(obj, str):
-        # For strings, handle special formatting
-        if len(obj) > 100 and '\n' in obj:
-            # For multiline strings, format with proper indentation
-            lines = obj.splitlines()
-            if len(lines) > 10:
-                # Truncate very long multiline strings
-                return '\n'.join(lines[:5] + ['...'] + lines[-5:])
-            return obj
-        elif len(obj) > 100:
-            # Truncate very long single-line strings
-            return obj[:97] + '...'
-        return obj
+@argumentToString.register(str)
+def _(obj):
+    if '\n' in obj:
+        return "'''" + obj + "'''"
+    return "'" + obj.replace('\\', '\\\\') + "'"
 
-    # Handle different types with better formatting
-    if isinstance(obj, dict):
-        try:
-            if len(obj) > 50:
-                # For very large dicts, show summary
-                return f"<dict with {len(obj)} items>"
-            # Use json.dumps with indent=2 for better readability
-            return json.dumps(obj, indent=2, sort_keys=True, default=str)
-        except (TypeError, ValueError):
-            pass
+class LITPrintDebugger:
+    _pairDelimiter = ', '
+    lineWrapWidth = DEFAULT_LINE_WRAP_WIDTH
+    contextDelimiter = DEFAULT_CONTEXT_DELIMITER
+    
+    def __init__(self, prefix=DEFAULT_PREFIX,
+                 outputFunction=DEFAULT_OUTPUT_FUNCTION,
+                 argToStringFunction=argumentToString, includeContext=False,
+                 contextAbsPath=False):
+        self.enabled = True
+        self.prefix = prefix
+        self.includeContext = includeContext
+        self.outputFunction = outputFunction
+        self.argToStringFunction = argToStringFunction
+        self.contextAbsPath = contextAbsPath
 
-    if isinstance(obj, (list, tuple)):
-        try:
-            if len(obj) > 50:
-                # For very large lists/tuples, show summary
-                return f"<{obj.__class__.__name__} with {len(obj)} items>"
-            # Format lists and tuples with json for better readability
-            return json.dumps(obj, indent=2, default=str)
-        except (TypeError, ValueError):
-            pass
+    def __call__(self, *args):
+        if self.enabled:
+            callFrame = inspect.currentframe().f_back
+            self.outputFunction(self._format(callFrame, *args))
 
-    # Handle special types
-    if hasattr(obj, '__dict__') and not isinstance(obj, type):
-        # For objects with __dict__, show attributes
-        attrs = {}
-        for key, value in obj.__dict__.items():
-            if not key.startswith('_'):
-                try:
-                    # Limit attribute value length for readability
-                    str_val = str(value)
-                    if len(str_val) > 50:
-                        str_val = str_val[:47] + '...'
-                    attrs[key] = str_val
-                except Exception:
-                    attrs[key] = "<error in __str__>"
+        if not args:
+            passthrough = None
+        elif len(args) == 1:
+            passthrough = args[0]
+        else:
+            passthrough = args
+        return passthrough
 
-        if attrs:
-            try:
-                return f"<{obj.__class__.__name__} {json.dumps(attrs, indent=2, default=str)}>"
-            except (TypeError, ValueError):
-                pass
+    def format(self, *args):
+        callFrame = inspect.currentframe().f_back
+        out = self._format(callFrame, *args)
+        return out
 
-    # Try general JSON serialization
-    try:
-        return json.dumps(obj, indent=2, default=str)
-    except (TypeError, ValueError):
-        # Fall back to pprint for complex objects
-        try:
-            return pprint.pformat(obj, indent=2, width=100, **kwargs)
-        except Exception:
-            # Last resort for objects that cause errors in pprint
-            return f"<{obj.__class__.__name__} at {hex(id(obj))}>"
+    def _format(self, callFrame, *args):
+        prefix = callOrValue(self.prefix)
+        context = self._formatContext(callFrame)
+        if not args:
+            time = self._formatTime()
+            out = prefix + context + time
+        else:
+            if self.includeContext:
+                # Format: LIT| [script.py:3] in calculate_total() >>> a: 10, b: 20
+                # prefix should be 'LIT| '
+                # context: '[script.py:3] in calculate_total()'
+                # delimiter: ' >>> '
+                # args: 'a: 10, b: 20'
+                # Compose output accordingly
+                # If user set a custom prefix, use it, else default to 'LIT| '
+                used_prefix = prefix if prefix.strip() else 'LIT| '
+                context_str = self._formatContext(callFrame)
+                args_str = self._formatArgs(callFrame, '', '', args)
+                # Remove any prefix/context from args_str
+                if args_str.startswith(prefix):
+                    args_str = args_str[len(prefix):]
+                if args_str.startswith(context_str):
+                    args_str = args_str[len(context_str):]
+                if args_str.startswith(self.contextDelimiter):
+                    args_str = args_str[len(self.contextDelimiter):]
+                out = f"{used_prefix}[{context_str}] >>> {args_str.strip()}"
+            else:
+                if not self.includeContext:
+                    context = ''
+                out = self._formatArgs(
+                    callFrame, prefix, context, args)
+        return out
+
+    def _formatArgs(self, callFrame, prefix, context, args):
+        callNode = Source.executing(callFrame).node
+        if callNode is not None:
+            source = Source.for_frame(callFrame)
+            sanitizedArgStrs = [
+                source.get_text_with_indentation(arg)
+                for arg in callNode.args]
+        else:
+            warnings.warn(
+                NO_SOURCE_AVAILABLE_WARNING_MESSAGE,
+                category=RuntimeWarning, stacklevel=4)
+            sanitizedArgStrs = [_absent] * len(args)
+        
+        pairs = list(zip(sanitizedArgStrs, args))
+        out = self._constructArgumentOutput(prefix, context, pairs)
+        return out
+
+    def _constructArgumentOutput(self, prefix, context, pairs):
+        def argPrefix(arg):
+            return '%s: ' % arg
+
+        pairs = [(arg, self.argToStringFunction(val)) for arg, val in pairs]
+        pairStrs = [
+            val if (isLiteral(arg) or arg is _absent)
+            else (argPrefix(arg) + val)
+            for arg, val in pairs]
+
+        allArgsOnOneLine = self._pairDelimiter.join(pairStrs)
+        multilineArgs = len(allArgsOnOneLine.splitlines()) > 1
+        contextDelimiter = self.contextDelimiter if context else ''
+        allPairs = prefix + context + contextDelimiter + allArgsOnOneLine
+        firstLineTooLong = len(allPairs.splitlines()[0]) > self.lineWrapWidth
+
+        if multilineArgs or firstLineTooLong:
+            if context:
+                lines = [prefix + context] + [
+                    formatPair(len(prefix) * ' ', arg, value)
+                    for arg, value in pairs
+                ]
+            else:
+                argLines = [
+                    formatPair('', arg, value)
+                    for arg, value in pairs
+                ]
+                lines = prefixFirstLineIndentRemaining(prefix, '\n'.join(argLines))
+        else:
+            lines = [prefix + context + contextDelimiter + allArgsOnOneLine]
+        return '\n'.join(lines)
+
+    def _formatContext(self, callFrame):
+        filename, lineNumber, parentFunction = self._getContext(callFrame)
+        if parentFunction != '<module>':
+            parentFunction = f'{parentFunction}()'
+        # Only return 'script.py:3] in calculate_total()' (no brackets)
+        context = f"{filename}:{lineNumber} in {parentFunction}"
+        return context
+
+    def _formatTime(self):
+        now = datetime.now()
+        formatted = now.strftime('%H:%M:%S.%f')[:-3]
+        return ' at %s' % formatted
+
+    def _getContext(self, callFrame):
+        frameInfo = inspect.getframeinfo(callFrame)
+        lineNumber = frameInfo.lineno
+        parentFunction = frameInfo.function
+        filepath = (realpath if self.contextAbsPath else basename)(frameInfo.filename)
+        return filepath, lineNumber, parentFunction
+
+    def enable(self):
+        self.enabled = True
+
+    def disable(self):
+        self.enabled = False
+
+    def configureOutput(self, prefix=_absent, outputFunction=_absent,
+                        argToStringFunction=_absent, includeContext=_absent,
+                        contextAbsPath=_absent):
+        noParameterProvided = all(
+            v is _absent for k, v in locals().items() if k != 'self')
+        if noParameterProvided:
+            raise TypeError('configureOutput() missing at least one argument')
+
+        if prefix is not _absent:
+            self.prefix = prefix
+        if outputFunction is not _absent:
+            self.outputFunction = outputFunction
+        if argToStringFunction is not _absent:
+            self.argToStringFunction = argToStringFunction
+        if includeContext is not _absent:
+            self.includeContext = includeContext
+        if contextAbsPath is not _absent:
+            self.contextAbsPath = contextAbsPath
 
 # Register special formatters for common types
 @argumentToString.register(type)
@@ -491,289 +408,6 @@ def _format_set(obj, **kwargs):
         return "{{\n  {}\n}}".format(formatted_items)
     except Exception:
         return f"<{obj.__class__.__name__} with {len(obj)} items>"
-
-class LITPrintDebugger:
-    _pairDelimiter = ', '
-    lineWrapWidth = DEFAULT_LINE_WRAP_WIDTH
-    contextDelimiter = DEFAULT_CONTEXT_DELIMITER
-    global_enabled = True
-
-    def __init__(self, prefix: str = DEFAULT_PREFIX,
-                 outputFunction: Any = DEFAULT_OUTPUT_FUNCTION,
-                 argToStringFunction: Any = argumentToString, includeContext: bool = True,
-                 contextAbsPath: bool = False, log_file: Optional[str] = None, color_style: Optional[Any] = None,
-                 disable_colors: bool = False, contextDelimiter: str = DEFAULT_CONTEXT_DELIMITER,
-                 log_timestamp: bool = False, style: str = 'default', filter_types: Optional[List[Type]] = None, flush: bool = False,
-                 pprint_options: Optional[dict] = None, rich_styles: Optional[dict] = None):
-        self.enabled = True
-        self.prefix = prefix
-        self.includeContext = includeContext
-        self.outputFunction = outputFunction if outputFunction is not None else DEFAULT_OUTPUT_FUNCTION
-        self.argToStringFunction = argToStringFunction
-        self.contextAbsPath = contextAbsPath
-        self.log_file = log_file
-        self.color_style = color_style
-        self.disable_colors = disable_colors
-        self.contextDelimiter = contextDelimiter if contextDelimiter is not None else ''
-        self.log_timestamp = log_timestamp
-        self.style = style
-        self.filter_types = filter_types
-        self.flush = flush
-        self.pprint_options = pprint_options if pprint_options is not None else {}
-        self.rich_styles = rich_styles if rich_styles is not None else {}
-        self._formatters: Dict[Type, Callable] = {}
-
-    def __call__(self, *args):
-        """
-        Call the debugger with arguments to print them.
-        Returns the arguments for easy integration into existing code.
-        """
-        if self.enabled and LITPrintDebugger.global_enabled:
-            callFrame = inspect.currentframe().f_back
-            formatted_output = self._format(callFrame, *args)
-            if self.disable_colors:
-                stderrPrint(formatted_output, flush=self.flush)
-            else:
-                self.outputFunction(formatted_output, self.color_style)
-            if self.log_file:
-                self._log_output(formatted_output)
-
-        # Return the arguments for easy integration into existing code
-        if not args:
-            passthrough = None
-        elif len(args) == 1:
-            passthrough = args[0]
-        else:
-            passthrough = args
-        return passthrough
-
-    def format(self, *args):
-        """
-        Format the arguments without printing them.
-        Returns the formatted string.
-        """
-        callFrame = inspect.currentframe().f_back
-        out = self._format(callFrame, *args)
-        return out
-
-    def _format(self, callFrame, *args):
-        prefix = callOrValue(self.prefix)
-        context = self._formatContext(callFrame) if self.includeContext else ''
-        if not args:
-            time = self._formatTime()
-            out = prefix + context + time
-        else:
-            out = self._formatArgs(
-                callFrame, prefix, context, args)
-        if not context:
-            self.contextDelimiter = ''
-        return out
-
-    def _formatArgs(self, callFrame, prefix, context, args):
-        callNode = Source.executing(callFrame).node
-        if callNode is not None:
-            source = Source.for_frame(callFrame)
-            sanitizedArgStrs = [
-                source.get_text_with_indentation(arg)
-                for arg in callNode.args]
-        else:
-            warnings.warn(
-                NO_SOURCE_AVAILABLE_WARNING_MESSAGE,
-                category=RuntimeWarning, stacklevel=4)
-            sanitizedArgStrs = [_absent] * len(args)
-        pairs = list(zip(sanitizedArgStrs, args))
-        if self.filter_types:
-            pairs = [(arg, val) for arg, val in pairs if any(isinstance(val, t) for t in self.filter_types)]
-        out = self._constructArgumentOutput(prefix, context, pairs)
-        return out
-
-    def _constructArgumentOutput(self, prefix, context, pairs):
-        def argPrefix(arg):
-            return '%s: ' % arg
-
-        # Process values with better formatting
-        processed_pairs = []
-        for arg, val in pairs:
-            # Format the value with proper indentation for multi-line output
-            formatted_val = self.argToStringFunction(val, **self.pprint_options)
-            processed_pairs.append((arg, formatted_val))
-
-        pairs = processed_pairs
-
-        if len(pairs) == 0:
-            return prefix + context
-
-        # Add visual separator for better readability
-        # Use a more prominent separator with better spacing
-        separator = " │ " if context else " "
-
-        # For single value output
-        if len(pairs) == 1:
-            arg, val = pairs[0]
-            if arg is _absent or isLiteral(arg):
-                # For simple values
-                return prefix + context + separator + val
-            else:
-                # For named values with better formatting for multiline output
-                if '\n' in val:
-                    # For multiline values, add a line break after the name
-                    # and indent the value for better readability
-                    indented_val = '\n  ' + val.replace('\n', '\n  ')
-                    return prefix + context + separator + argPrefix(arg) + indented_val
-                else:
-                    # For single line values
-                    return prefix + context + separator + argPrefix(arg) + val
-
-        # Format multiple arguments
-        pairStrs = []
-        max_arg_len = 0
-
-        # First pass to determine the maximum argument name length for alignment
-        for arg, _ in pairs:
-            if not (isLiteral(arg) or arg is _absent):
-                max_arg_len = max(max_arg_len, len(str(arg)))
-
-        # Second pass to format each pair with proper alignment
-        for arg, val in pairs:
-            if isLiteral(arg) or arg is _absent:
-                pairStrs.append(val)
-            else:
-                # Check if value is multiline
-                if '\n' in val:
-                    # For multiline values, add a line break after the name
-                    # and indent the value for better readability
-                    indented_val = '\n  ' + val.replace('\n', '\n  ')
-                    pairStrs.append(f"{arg:{max_arg_len}}: {indented_val}")
-                else:
-                    # For single line values, align the colons
-                    pairStrs.append(f"{arg:{max_arg_len}}: {val}")
-
-        # Join with clear separator and better spacing
-        if any('\n' in s for s in pairStrs):
-            # If any value is multiline, put each pair on a new line for better readability
-            joined = '\n  '.join(pairStrs)
-            allArgsOnOneLine = f"\n  {joined}"
-        else:
-            # For simple values, keep them on one line with comma separation
-            allArgsOnOneLine = ",  ".join(pairStrs)
-
-        contextDelimiter = self.contextDelimiter if context else ''
-
-        return prefix + context + contextDelimiter + separator + allArgsOnOneLine
-
-    def _formatContext(self, callFrame):
-        filename, lineNumber, parentFunction = self._getContext(callFrame)
-        if parentFunction == "<module>":
-            parentFunction = "()"
-        else:
-            parentFunction = '%s()' % parentFunction
-
-        # Format for clickable links in supported terminals
-        if self.contextAbsPath:
-            # Use format that VSCode and other editors recognize as clickable
-            # This format creates a clickable link in most modern terminals and editors
-            # Format: file:line:column
-            context = '%s:%s:%s in %s' % (filename, lineNumber, 1, parentFunction)
-        else:
-            # For relative paths, still make them clickable but with brackets for better visibility
-            context = '[%s:%s] in %s' % (filename, lineNumber, parentFunction)
-
-        return context
-
-    def _formatTime(self):
-        now = datetime.now()
-        formatted = now.strftime('%H:%M:%S.%f')[:-3]
-        return ' at %s' % formatted
-
-    def _getContext(self, callFrame):
-        frames = inspect.stack()
-
-        # Start from the frame where _getContext is called (which is 2 frames back)
-        for frame_info in frames[2:]:
-            if frame_info.function not in ['_formatContext', '_format', 'lit', 'litprint', 'log', '_lit_implementation', '_log_implementation']: # Skip litprint internals
-                lineNumber = frame_info.lineno
-                parentFunction = frame_info.function
-                
-                # Improve cross-platform path handling
-                if self.contextAbsPath:
-                    filepath = os.path.normpath(realpath(frame_info.filename))
-                else:
-                    filepath = os.path.normpath(basename(frame_info.filename))
-                
-                return filepath, lineNumber, parentFunction
-
-        # If no other frame is found, return module information
-        frameInfo = inspect.getframeinfo(callFrame)
-        lineNumber = frameInfo.lineno
-        parentFunction = frameInfo.function
-        
-        # Improve cross-platform path handling
-        if self.contextAbsPath:
-            filepath = os.path.normpath(realpath(frameInfo.filename))
-        else:
-            filepath = os.path.normpath(basename(frameInfo.filename))
-            
-        return filepath, lineNumber, parentFunction
-
-    def enable(self):
-        """Enable the debugger"""
-        self.enabled = True
-
-    def disable(self):
-        """Disable the debugger"""
-        self.enabled = False
-
-    @classmethod
-    def enable_globally(cls):
-        """Enable all debugger instances"""
-        cls.global_enabled = True
-
-    @classmethod
-    def disable_globally(cls):
-        """Disable all debugger instances"""
-        cls.global_enabled = False
-
-    def register_formatter(self, cls: Type, formatter: Callable):
-        """Register a custom formatter for a specific type"""
-        self._formatters[cls] = formatter
-
-    def unregister_formatter(self, cls: Type):
-        """Unregister a custom formatter"""
-        if cls in self._formatters:
-            del self._formatters[cls]
-
-    def _log_output(self, output):
-        with open(self.log_file, 'a') as f:
-            if self.log_timestamp:
-                now = datetime.now()
-                formatted = now.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-                f.write(f'[{formatted}] {output}\n')
-            else:
-                f.write(output + '\n')
-
-    def configureOutput(self, prefix=None, outputFunction=None, argToStringFunction=None,
-                        includeContext=None, contextAbsPath=None):
-        """
-        Configure the output format and behavior.
-
-        Args:
-            prefix: String or function that returns a string to prefix output
-            outputFunction: Function to handle output (default: print to stderr)
-            argToStringFunction: Function to convert arguments to strings
-            includeContext: Whether to include file, line, and function context
-            contextAbsPath: Whether to use absolute paths in context
-        """
-        if prefix is not None:
-            self.prefix = prefix
-        if outputFunction is not None:
-            self.outputFunction = outputFunction
-        if argToStringFunction is not None:
-            self.argToStringFunction = argToStringFunction
-        if includeContext is not None:
-            self.includeContext = includeContext
-        if contextAbsPath is not None:
-            self.contextAbsPath = contextAbsPath
-
 
 # Additional formatters for better display
 @argumentToString.register(list)

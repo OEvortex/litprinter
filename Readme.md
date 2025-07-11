@@ -35,12 +35,16 @@ lit(x, y)  # Prints: LIT| [script.py:6] in () >>> x: 10, y: 20
 ### 🎨 Rich Syntax Highlighting
 
 ```python
-# Choose from multiple color themes
-from litprinter import lit
-lit.color_style = "CYBERPUNK"  # Options: JARVIS, RICH, MODERN, NEON, CYBERPUNK, DRACULA, MONOKAI
 
+from litprinter import LIT
+my_complex_object = {
+    "name": "LitPrinter",
+    "version": 1.0,
+    "features": ["debugging", "formatting", "tracebacks"],
+    "active": True
+}
 # Or use as a parameter
-lit(my_complex_object, color_style="NEON")
+LIT(my_complex_object)
 ```
 
 ### 📊 Smart Object Formatting
@@ -55,7 +59,7 @@ data = {
         "notifications": True
     }
 }
-lit(data)  # Formatted with proper indentation and syntax highlighting
+LIT(data)  # Formatted with proper indentation and syntax highlighting
 ```
 
 ### 🔍 Context-Aware Output
@@ -63,7 +67,7 @@ lit(data)  # Formatted with proper indentation and syntax highlighting
 ```python
 # Shows file, line number, and function name
 def calculate_total(a, b):
-    lit(a, b)  # Shows: LIT| [script.py:3] in calculate_total() >>> a: 10, b: 20
+    LIT(a, b)  # Shows: LIT| [script.py:3] in calculate_total() >>> a: 10, b: 20
     return a + b
 ```
 
@@ -161,8 +165,11 @@ Or for direct access to LitPrinter's functions:
 
 ```python
 # Install as builtins for convenience
-from litprinter import install
+from litprinter.builtins import install, uninstall
 install()  # Now 'litprint' and 'ic' are available globally
+
+# Uninstall from builtins
+uninstall()
 
 # Import performance and system utilities
 from litprinter.core import clearStyleCache, getStyleCacheInfo, isTerminalCapable
@@ -176,9 +183,10 @@ from litprinter.core import clearStyleCache, getStyleCacheInfo, isTerminalCapabl
 |----------|-------------|
 | `lit(*args, **kwargs)` | Primary debugging function with variable inspection |
 | `litprint(*args, **kwargs)` | Alias for `lit` with similar behavior |
+| `ic(*args, **kwargs)` | Another alias for `lit`, for icecream-style usage |
 | `log(*args, level="debug", **kwargs)` | Logging with level support |
-| `install(name='litprint', ic='ic')` | Install functions as builtins |
-| `uninstall(name='litprint', ic='ic')` | Remove from builtins |
+| `install(name='litprint', ic='ic')` | Install functions as builtins (from `litprinter.builtins`) |
+| `uninstall(name='litprint', ic='ic')` | Remove from builtins (from `litprinter.builtins`) |
 
 ### Traceback Module Functions
 
@@ -209,6 +217,13 @@ from litprinter.core import clearStyleCache, getStyleCacheInfo, isTerminalCapabl
 | `isTerminalCapable()` | Check if terminal supports color output (respects NO_COLOR standard) |
 
 ## 📚 Examples
+### Using the `ic` Alias
+
+```python
+from litprinter import ic
+
+ic("Hello, world!")  # Prints: ic| "Hello, world!"
+```
 
 ### Debug Print with Context
 
