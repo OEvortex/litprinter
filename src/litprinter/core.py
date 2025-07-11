@@ -37,9 +37,8 @@ except ImportError as exc:  # pragma: no cover - required
         "The 'executing' package is required for litprinter."
     ) from exc
 from pygments import highlight
-from pygments.formatters import Terminal256Formatter, HtmlFormatter
-from pygments.lexers import PythonLexer as PyLexer, Python3Lexer as Py3Lexer
-from pygments.token import Token
+from pygments.formatters import Terminal256Formatter
+from pygments.lexers import Python3Lexer as Py3Lexer
 from typing import Any, List, Type, Optional, Dict, Callable
 from .styles import (
     JARVIS, RICH, MODERN, NEON, CYBERPUNK, DRACULA, MONOKAI,
@@ -56,62 +55,116 @@ def bindStaticVariable(name, value):
         return fn
     return decorator
 
-@bindStaticVariable('formatter', Terminal256Formatter(style=CYBERPUNK))
-@bindStaticVariable(
-    'lexer', Py3Lexer(ensurenl=False))
-def colorize(s, color_style=None):
+# Style formatter cache for performance optimization
+_style_cache = {}
+
+
+def _get_cached_formatter(color_style):
+    """
+    Get a cached formatter for the given color style.
+    Creates and caches formatters to avoid repeated object creation.
+    """
+    # Create a cache key
+    if color_style is None:
+        cache_key = 'default'
+    elif isinstance(color_style, str):
+        cache_key = color_style.lower()
+    elif isinstance(color_style, dict):
+        # For custom styles, create a hash of the dict
+        cache_key = f"custom_{hash(tuple(sorted(color_style.items())))}"
+    else:
+        # For other style objects, use their string representation
+        cache_key = f"object_{str(color_style)}"
+    
+    # Check cache first
+    if cache_key in _style_cache:
+        return _style_cache[cache_key]
+    
+    # Create formatter if not cached
     if color_style is None:
         formatter = Terminal256Formatter(style=CYBERPUNK)  # Use CYBERPUNK as default
     elif isinstance(color_style, str):
         # Allow selecting style by name (case-insensitive)
         style_name = color_style.lower()
-        if style_name == 'jarvis':
-            formatter = Terminal256Formatter(style=JARVIS)
-        elif style_name == 'rich':
-            formatter = Terminal256Formatter(style=RICH)
-        elif style_name == 'modern':
-            formatter = Terminal256Formatter(style=MODERN)
-        elif style_name == 'neon':
-            formatter = Terminal256Formatter(style=NEON)
-        elif style_name == 'cyberpunk':
-            formatter = Terminal256Formatter(style=CYBERPUNK)
-        elif style_name == 'dracula':
-            formatter = Terminal256Formatter(style=DRACULA)
-        elif style_name == 'monokai':
-            formatter = Terminal256Formatter(style=MONOKAI)
-        elif style_name == 'solarized':
-            formatter = Terminal256Formatter(style=SOLARIZED)
-        elif style_name == 'nord':
-            formatter = Terminal256Formatter(style=NORD)
-        elif style_name == 'github':
-            formatter = Terminal256Formatter(style=GITHUB)
-        elif style_name == 'vscode':
-            formatter = Terminal256Formatter(style=VSCODE)
-        elif style_name == 'material':
-            formatter = Terminal256Formatter(style=MATERIAL)
-        elif style_name == 'retro':
-            formatter = Terminal256Formatter(style=RETRO)
-        elif style_name == 'ocean':
-            formatter = Terminal256Formatter(style=OCEAN)
-        elif style_name == 'autumn':
-            formatter = Terminal256Formatter(style=AUTUMN)
-        elif style_name == 'synthwave':
-            formatter = Terminal256Formatter(style=SYNTHWAVE)
-        elif style_name == 'forest':
-            formatter = Terminal256Formatter(style=FOREST)
-        elif style_name == 'monochrome':
-            formatter = Terminal256Formatter(style=MONOCHROME)
-        elif style_name == 'sunset':
-            formatter = Terminal256Formatter(style=SUNSET)
+        style_map = {
+            'jarvis': JARVIS,
+            'rich': RICH,
+            'modern': MODERN,
+            'neon': NEON,
+            'cyberpunk': CYBERPUNK,
+            'dracula': DRACULA,
+            'monokai': MONOKAI,
+            'solarized': SOLARIZED,
+            'nord': NORD,
+            'github': GITHUB,
+            'vscode': VSCODE,
+            'material': MATERIAL,
+            'retro': RETRO,
+            'ocean': OCEAN,
+            'autumn': AUTUMN,
+            'synthwave': SYNTHWAVE,
+            'forest': FOREST,
+            'monochrome': MONOCHROME,
+            'sunset': SUNSET,
+        }
+        
+        if style_name in style_map:
+            formatter = Terminal256Formatter(style=style_map[style_name])
         else:
             # Try to use the string as a style name
-            formatter = Terminal256Formatter(style=color_style)
+            try:
+                formatter = Terminal256Formatter(style=color_style)
+            except Exception:
+                # Fall back to default if style is invalid
+                formatter = Terminal256Formatter(style=CYBERPUNK)
     elif isinstance(color_style, dict):
-        CustomStyle = create_custom_style('CustomStyle', color_style)
-        formatter = Terminal256Formatter(style=CustomStyle)
+        try:
+            CustomStyle = create_custom_style('CustomStyle', color_style)
+            formatter = Terminal256Formatter(style=CustomStyle)
+        except Exception:
+            # Fall back to default if custom style creation fails
+            formatter = Terminal256Formatter(style=CYBERPUNK)
     else:
-        formatter = Terminal256Formatter(style=color_style)
+        try:
+            formatter = Terminal256Formatter(style=color_style)
+        except Exception:
+            # Fall back to default if style object is invalid
+            formatter = Terminal256Formatter(style=CYBERPUNK)
+    
+    # Cache the formatter
+    _style_cache[cache_key] = formatter
+    return formatter
+
+
+@bindStaticVariable('formatter', Terminal256Formatter(style=CYBERPUNK))
+@bindStaticVariable(
+    'lexer', Py3Lexer(ensurenl=False))
+def colorize(s, color_style=None):
+    """
+    Colorize string using pygments with improved caching for better performance.
+    """
+    formatter = _get_cached_formatter(color_style)
     return highlight(s, colorize.lexer, formatter)
+
+
+def clearStyleCache():
+    """
+    Clear the style formatter cache.
+    Useful for testing or when memory usage is a concern.
+    """
+    global _style_cache
+    _style_cache.clear()
+
+
+def getStyleCacheInfo():
+    """
+    Get information about the current style cache.
+    Returns a dictionary with cache statistics.
+    """
+    return {
+        'cache_size': len(_style_cache),
+        'cached_styles': list(_style_cache.keys())
+    }
 
 @contextmanager
 def supportTerminalColorsInWindows():
@@ -204,7 +257,7 @@ def stdoutPrint(s, color_style=None, sep=' ', end='\n', flush=False):
     else:
         print(s, sep=sep, end=end, flush=flush)
 
-DEFAULT_PREFIX = 'LIT| '
+DEFAULT_PREFIX = 'LIT| '  # Changed from 'LIT -> ' for better visual separation
 DEFAULT_LINE_WRAP_WIDTH = 70
 DEFAULT_CONTEXT_DELIMITER = '- '
 DEFAULT_OUTPUT_FUNCTION = colorizedStderrPrint
