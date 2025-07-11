@@ -14,9 +14,9 @@ debugging purposes. It leverages the LITPrintDebugger class from 'core.py' and a
 for configurable prefix, output functions, and context inclusion. It's designed
 to make debugging more straightforward by offering clear output with context information.
 """
-import inspect
-from .core import LITPrintDebugger, argumentToString, DEFAULT_PREFIX
+from ._core_functions import _lit_implementation, _log_implementation
 from typing import Any, List, Type, Optional
+
 
 def lit(
     *args,
@@ -66,10 +66,11 @@ def lit(
     Returns:
         The arguments passed to the function, allowing it to be used inline in expressions.
     """
-    debugger = LITPrintDebugger(**kwargs,
-        prefix=prefix if prefix is not None else DEFAULT_PREFIX,
+    return _lit_implementation(
+        *args,
+        prefix=prefix,
         outputFunction=outputFunction,
-        argToStringFunction=argToStringFunction if argToStringFunction is not None else argumentToString,
+        argToStringFunction=argToStringFunction,
         includeContext=includeContext,
         contextAbsPath=contextAbsPath,
         log_file=log_file,
@@ -77,34 +78,16 @@ def lit(
         disable_colors=disable_colors,
         contextDelimiter=contextDelimiter,
         log_timestamp=log_timestamp,
+        sep=sep,
+        end=end,
         style=style,
         filter_types=filter_types,
         flush=flush,
         pprint_options=pprint_options,
-        rich_styles=rich_styles
+        rich_styles=rich_styles,
+        **kwargs
     )
-    
-    # Return the arguments for easy integration into existing code
-    if not args:
-        return None
-    elif len(args) == 1:
-        passthrough = args[0]
-    else:
-        passthrough = args
-        
-    # Format and output
-    formatted_output = debugger._format(inspect.currentframe().f_back, *args)
-    if debugger.disable_colors:
-        from .core import stderrPrint
-        stderrPrint(formatted_output, sep=sep, end=end, flush=flush)
-    else:
-        if debugger.outputFunction is print:
-            from .core import stdoutPrint
-            stdoutPrint(formatted_output, debugger.color_style, sep=sep, end=end, flush=flush)
-        else:
-            debugger.outputFunction(formatted_output, debugger.color_style, sep=sep, end=end, flush=flush)
-        
-    return passthrough
+
 
 def log(
     *args,
@@ -156,10 +139,12 @@ def log(
     Returns:
         The arguments passed to the function, allowing it to be used inline in expressions.
     """
-    debugger = LITPrintDebugger(**kwargs,
-        prefix=prefix if prefix is not None else f"[{level.upper()}] " + DEFAULT_PREFIX,
+    return _log_implementation(
+        *args,
+        level=level,
+        prefix=prefix,
         outputFunction=outputFunction,
-        argToStringFunction=argToStringFunction if argToStringFunction is not None else argumentToString,
+        argToStringFunction=argToStringFunction,
         includeContext=includeContext,
         contextAbsPath=contextAbsPath,
         log_file=log_file,
@@ -167,34 +152,16 @@ def log(
         disable_colors=disable_colors,
         contextDelimiter=contextDelimiter,
         log_timestamp=log_timestamp,
+        sep=sep,
+        end=end,
         style=style,
         filter_types=filter_types,
         flush=flush,
         pprint_options=pprint_options,
-        rich_styles=rich_styles
+        rich_styles=rich_styles,
+        **kwargs
     )
-    
-    # Return the arguments for easy integration into existing code
-    if not args:
-        return None
-    elif len(args) == 1:
-        passthrough = args[0]
-    else:
-        passthrough = args
-        
-    # Format and output
-    formatted_output = debugger._format(inspect.currentframe().f_back, *args)
-    if debugger.disable_colors:
-        from .core import stderrPrint
-        stderrPrint(formatted_output, sep=sep, end=end, flush=flush)
-    else:
-        if debugger.outputFunction is print:
-            from .core import stdoutPrint
-            stdoutPrint(formatted_output, debugger.color_style, sep=sep, end=end, flush=flush)
-        else:
-            debugger.outputFunction(formatted_output, debugger.color_style, sep=sep, end=end, flush=flush)
-        
-    return passthrough
+
 
 # Aliases for compatibility with icecream
 ic = lit

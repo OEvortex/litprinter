@@ -16,6 +16,7 @@ names, colorizing output, and configurable options.
 from __future__ import print_function
 import ast
 import inspect
+import os
 import pprint
 import sys
 import warnings
@@ -114,14 +115,52 @@ def colorize(s, color_style=None):
 
 @contextmanager
 def supportTerminalColorsInWindows():
+    """
+    Context manager for Windows terminal color support.
+    Provides better detection and graceful fallbacks.
+    """
     if colorama is not None:
-        colorama.init()
+        # Initialize colorama for Windows compatibility
+        colorama.init(autoreset=True, strip=False, convert=True)
         try:
             yield
         finally:
             colorama.deinit()
     else:
+        # No colorama available - check if we're on Windows and warn if needed
+        if sys.platform.startswith('win'):
+            # On Windows without colorama, colors might not work properly
+            # but we'll still try to output them
+            pass
         yield
+
+
+def isTerminalCapable():
+    """
+    Detect if the current terminal supports color output.
+    Returns True if colors should be displayed, False otherwise.
+    """
+    # Check if we're in a pipe or redirect
+    if not hasattr(sys.stderr, 'isatty') or not sys.stderr.isatty():
+        return False
+    
+    # Check environment variables that indicate color support
+    term = os.environ.get('TERM', '').lower()
+    colorterm = os.environ.get('COLORTERM', '').lower()
+    
+    # Common terminals that support color
+    color_terms = ['xterm', 'xterm-256color', 'screen', 'tmux', 'vt100', 'vt220']
+    
+    # Check for explicit color support indicators
+    if colorterm in ['truecolor', '24bit'] or any(t in term for t in color_terms):
+        return True
+        
+    # Check for NO_COLOR environment variable (follows standard)
+    if os.environ.get('NO_COLOR'):
+        return False
+        
+    # Default to True on most platforms, let colorama handle Windows
+    return True
 
 def stderrPrint(*args, sep=' ', end='\n', flush=False):
     print(*args, file=sys.stderr, sep=sep, end=end, flush=flush)
@@ -134,16 +173,33 @@ def isLiteral(s):
     return True
 
 def colorizedStderrPrint(s, color_style=None, sep=' ', end='\n', flush=False):
-    colored = colorize(s, color_style)
-    with supportTerminalColorsInWindows():
-        stderrPrint(colored, sep=sep, end=end, flush=flush)
+    """
+    Print to stderr with color support and improved cross-platform compatibility.
+    """
+    # Check if colors should be used
+    if not isTerminalCapable():
+        # Fall back to plain text if terminal doesn't support colors
+        stderrPrint(s, sep=sep, end=end, flush=flush)
+        return
+        
+    try:
+        colored = colorize(s, color_style)
+        with supportTerminalColorsInWindows():
+            stderrPrint(colored, sep=sep, end=end, flush=flush)
+    except Exception:
+        # If coloring fails for any reason, fall back to plain text
+        stderrPrint(s, sep=sep, end=end, flush=flush)
 
 
 def stdoutPrint(s, color_style=None, sep=' ', end='\n', flush=False):
-    """Print to stdout with optional color support."""
-    if color_style is not None:
-        s = colorize(s, color_style)
-        with supportTerminalColorsInWindows():
+    """Print to stdout with optional color support and improved cross-platform compatibility."""
+    if color_style is not None and isTerminalCapable():
+        try:
+            s = colorize(s, color_style)
+            with supportTerminalColorsInWindows():
+                print(s, sep=sep, end=end, flush=flush)
+        except Exception:
+            # If coloring fails, fall back to plain text
             print(s, sep=sep, end=end, flush=flush)
     else:
         print(s, sep=sep, end=end, flush=flush)
@@ -581,17 +637,29 @@ class LITPrintDebugger:
 
         # Start from the frame where _getContext is called (which is 2 frames back)
         for frame_info in frames[2:]:
-            if frame_info.function not in ['_formatContext', '_format', 'lit', 'litprint', 'log']: # Skip litprint internals
+            if frame_info.function not in ['_formatContext', '_format', 'lit', 'litprint', 'log', '_lit_implementation', '_log_implementation']: # Skip litprint internals
                 lineNumber = frame_info.lineno
                 parentFunction = frame_info.function
-                filepath = (realpath if self.contextAbsPath else basename)(frame_info.filename)
+                
+                # Improve cross-platform path handling
+                if self.contextAbsPath:
+                    filepath = os.path.normpath(realpath(frame_info.filename))
+                else:
+                    filepath = os.path.normpath(basename(frame_info.filename))
+                
                 return filepath, lineNumber, parentFunction
 
         # If no other frame is found, return module information
         frameInfo = inspect.getframeinfo(callFrame)
         lineNumber = frameInfo.lineno
         parentFunction = frameInfo.function
-        filepath = (realpath if self.contextAbsPath else basename)(frameInfo.filename)
+        
+        # Improve cross-platform path handling
+        if self.contextAbsPath:
+            filepath = os.path.normpath(realpath(frameInfo.filename))
+        else:
+            filepath = os.path.normpath(basename(frameInfo.filename))
+            
         return filepath, lineNumber, parentFunction
 
     def enable(self):
