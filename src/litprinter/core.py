@@ -392,7 +392,7 @@ class LITPrintDebugger:
     def __init__(self, prefix: str = DEFAULT_PREFIX,
                  outputFunction: Any = DEFAULT_OUTPUT_FUNCTION,
                  argToStringFunction: Any = argumentToString, includeContext: bool = True,
-                 contextAbsPath: bool = False, log_file: Optional[str] = None, color_style: Any | None = None,
+                 contextAbsPath: bool = False, log_file: Optional[str] = None, color_style: Optional[Any] = None,
                  disable_colors: bool = False, contextDelimiter: str = DEFAULT_CONTEXT_DELIMITER,
                  log_timestamp: bool = False, style: str = 'default', filter_types: Optional[List[Type]] = None, flush: bool = False,
                  pprint_options: Optional[dict] = None, rich_styles: Optional[dict] = None):

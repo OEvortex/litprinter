@@ -1,7 +1,7 @@
 """
 DRACULA Style - A popular dark theme with a distinct purple and cyan palette.
 """
-from litprinter.styles.base import (
+from .base import (
     Style, Text, Name, Error, Other, String, Number, Keyword, Generic, Literal,
     Comment, Operator, Whitespace, Punctuation
 )

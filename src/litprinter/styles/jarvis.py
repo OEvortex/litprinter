@@ -1,7 +1,7 @@
 """
 JARVIS Style - A Tron-inspired theme with black background and vibrant cyan/green/magenta highlights.
 """
-from litprinter.styles.base import (
+from .base import (
     Style, Text, Name, Error, Other, String, Number, Keyword, Generic, Literal,
     Comment, Operator, Whitespace, Punctuation
 )
