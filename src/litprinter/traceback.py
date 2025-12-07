@@ -54,6 +54,9 @@ try:
 except ImportError:
     ClassType: TypeAlias = type
 
+# Type alias for suppression paths
+SuppressType = Iterable[str]
+
 # --- Pygments Requirement & Style Imports ---
 # We import all these Pygments components conditionally to support environments without Pygments
 # The token imports are for custom style definitions that may be needed in the future
@@ -405,7 +408,9 @@ class PrettyTraceback:
     - Local variable inspection
     - Better visual formatting of error information
     - Support for exception chaining
+    - Frame suppression for cleaner output
     - Customizable themes
+    - Rich protocol support for integration with Rich console
 
     Args:
         exc_type: The exception type
@@ -418,7 +423,11 @@ class PrettyTraceback:
         locals_max_string: Maximum length for string variables
         locals_max_depth: Maximum depth for nested structures
         locals_hide_dunder: Whether to hide dunder variables
+        locals_hide_sunder: Whether to hide single-underscore variables
         width: Terminal width (auto-detected if None)
+        suppress: Paths/modules to suppress from traceback
+        max_frames: Maximum number of frames to show
+        word_wrap: Whether to wrap long lines in code display
         _selected_pygments_style_cls: Pre-selected Pygments style class
     """
     def __init__(
@@ -434,7 +443,11 @@ class PrettyTraceback:
         locals_max_string: int = MAX_VARIABLE_LENGTH,
         locals_max_depth: int = LOCALS_MAX_DEPTH,
         locals_hide_dunder: bool = True,
+        locals_hide_sunder: bool = False,
         width: Optional[int] = None,
+        suppress: SuppressType = (),
+        max_frames: int = 100,
+        word_wrap: bool = False,
         _selected_pygments_style_cls: Optional[Type[PygmentsStyle]] = None, # type: ignore
     ):
         self.exc_type = exc_type
@@ -447,7 +460,11 @@ class PrettyTraceback:
         self.locals_max_string = locals_max_string
         self.locals_max_depth = locals_max_depth
         self.locals_hide_dunder = locals_hide_dunder
+        self.locals_hide_sunder = locals_hide_sunder
         self.terminal_width = width or self._get_terminal_width()
+        self.suppress = set(suppress)
+        self.max_frames = max_frames
+        self.word_wrap = word_wrap
         self._pp = pprint.PrettyPrinter(depth=self.locals_max_depth, width=max(20, self.terminal_width - 20), compact=True)
 
         self.formatter = None
@@ -963,6 +980,94 @@ class PrettyTraceback:
             print(f"Formatter failed: {e}", file=sys.stderr)
             print("--- ORIGINAL TRACEBACK ---", file=sys.stderr)
             traceback.print_exception(self.exc_type, self.exc_value, self.tb, file=sys.stderr)
+    
+    @classmethod
+    def from_exception(
+        cls,
+        exc_type: Type[BaseException],
+        exc_value: BaseException,
+        traceback_obj: Optional[TracebackType],
+        **kwargs,
+    ) -> "PrettyTraceback":
+        """Create a PrettyTraceback from exception info.
+        
+        This is a convenience classmethod for creating a PrettyTraceback
+        from exception information, similar to sys.exc_info().
+        
+        Args:
+            exc_type: The exception type.
+            exc_value: The exception value.
+            traceback_obj: The traceback object.
+            **kwargs: Additional arguments for PrettyTraceback.
+            
+        Returns:
+            A new PrettyTraceback instance.
+            
+        Example:
+            >>> try:
+            ...     raise ValueError("example")
+            ... except:
+            ...     tb = PrettyTraceback.from_exception(*sys.exc_info())
+            ...     tb.print()
+        """
+        return cls(exc_type, exc_value, traceback_obj, **kwargs)
+    
+    def is_suppressed(self, path: str) -> bool:
+        """Check if a path should be suppressed from the traceback.
+        
+        Args:
+            path: The file path to check.
+            
+        Returns:
+            True if the path should be suppressed.
+        """
+        if not self.suppress:
+            return False
+        
+        path_lower = path.lower()
+        for suppress_path in self.suppress:
+            if suppress_path.lower() in path_lower:
+                return True
+        return False
+    
+    def __rich_console__(self, console: Any, options: Any) -> Iterable[Any]:
+        """Rich console protocol for segment-based rendering.
+        
+        This method allows PrettyTraceback to be used with Rich-compatible
+        consoles that support the renderable protocol.
+        
+        Args:
+            console: The console instance.
+            options: Console rendering options.
+            
+        Yields:
+            Lines of the rendered traceback.
+        """
+        for line in self._render_traceback():
+            yield line + "\n"
+    
+    def __rich_measure__(self, console: Any, options: Any) -> tuple:
+        """Rich measure protocol for width calculation.
+        
+        Args:
+            console: The console instance.
+            options: Console rendering options.
+            
+        Returns:
+            Tuple of (minimum_width, maximum_width).
+        """
+        return (40, self.terminal_width)
+    
+    def __str__(self) -> str:
+        """Return rendered traceback as string."""
+        return "\n".join(self._render_traceback())
+    
+    def __repr__(self) -> str:
+        """Return traceback representation."""
+        exc_name = getattr(self.exc_type, "__name__", str(self.exc_type))
+        return f"PrettyTraceback({exc_name}, show_locals={self.show_locals})"
+
+
 
 # --- Installation Function ---
 _original_excepthook: Optional[Callable] = None
@@ -1209,3 +1314,7 @@ if __name__ == "__main__":
     #     print("\nCaught SyntaxError as expected.\n")
 
     uninstall()
+
+# Alias for Rich-compatible naming
+Traceback = PrettyTraceback
+

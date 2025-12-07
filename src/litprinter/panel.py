@@ -12,19 +12,34 @@ License: MIT
 """
 
 import os
+import re
 import shutil
 import textwrap
-from typing import Optional, Union, Literal, Dict, Any, List, Tuple, Callable
+from typing import Optional, Union, Literal, Dict, Any, List, Tuple, Callable, Iterator, TYPE_CHECKING
 from dataclasses import dataclass, field
 from enum import Enum
 from abc import ABC, abstractmethod
 
 try:
     from .colors import Colors
+    from .box import Box, ROUNDED, HEAVY, DOUBLE, SQUARE, ASCII, NONE as BOX_NONE, get_box
+    from .segment import Segment as RichSegment
+    from .style import Style
+    from .text import Text
 except ImportError:
     import sys
     sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
     from litprinter.colors import Colors
+    try:
+        from litprinter.box import Box, ROUNDED, HEAVY, DOUBLE, SQUARE, ASCII, NONE as BOX_NONE, get_box
+        from litprinter.segment import Segment as RichSegment
+        from litprinter.style import Style
+        from litprinter.text import Text
+    except ImportError:
+        Box = None
+        RichSegment = None
+        Style = None
+        Text = None
 
 
 class BorderStyle(Enum):
@@ -197,6 +212,15 @@ class Panel:
     - Content wrapping and truncation options
     - Vertical alignment and content distribution
     - Theme support and style inheritance
+    - Rich protocol support (__rich_console__, __rich_measure__)
+    
+    Example:
+        >>> from litprinter import Panel
+        >>> panel = Panel("Hello, World!", title="Greeting")
+        >>> print(panel.render())
+        
+        >>> # Create a fitted panel (doesn't expand)
+        >>> fitted = Panel.fit("Short content", title="Fitted")
     """
     
     def __init__(
@@ -354,6 +378,133 @@ class Panel:
         except Exception:
             return 80, 20
     
+    @classmethod
+    def fit(
+        cls,
+        renderable: Union[str, "RenderableType"],
+        *,
+        title: Optional[str] = None,
+        subtitle: Optional[str] = None,
+        border_style: Union[BorderStyle, str] = BorderStyle.ROUNDED,
+        border_color: Optional[str] = None,
+        padding: Union[Padding, int, Tuple[int, ...]] = (0, 1),
+        **kwargs,
+    ) -> "Panel":
+        """Create a panel that fits the content without expanding.
+        
+        This is a convenience classmethod that creates a Panel with
+        expand=False, so the panel will be sized to fit its content.
+        
+        Args:
+            renderable: The content to display.
+            title: Optional title for the panel.
+            subtitle: Optional subtitle for the panel.
+            border_style: Border style to use.
+            border_color: Color for the border.
+            padding: Padding around content.
+            **kwargs: Additional Panel arguments.
+            
+        Returns:
+            A Panel instance that fits its content.
+            
+        Example:
+            >>> panel = Panel.fit("Hello, World!", title="Greeting")
+        """
+        return cls(
+            renderable,
+            title=title,
+            subtitle=subtitle,
+            border_style=border_style,
+            border_color=border_color,
+            padding=padding,
+            expand=False,
+            **kwargs,
+        )
+    
+    def __rich_console__(self, console: Any, options: Any) -> Iterator[Any]:
+        """Rich console protocol for segment-based rendering.
+        
+        This method allows Panel to be used with Rich-compatible consoles
+        that support the renderable protocol.
+        
+        Args:
+            console: The console instance.
+            options: Console rendering options.
+            
+        Yields:
+            Segment objects for rendering.
+        """
+        # Render the panel to string and yield as segments
+        rendered = self.render()
+        if RichSegment is not None:
+            for line in rendered.split('\n'):
+                yield RichSegment(line)
+                yield RichSegment.line()
+        else:
+            # Fallback if RichSegment not available
+            yield rendered
+    
+    def __rich_measure__(self, console: Any, options: Any) -> Tuple[int, int]:
+        """Rich measure protocol for width calculation.
+        
+        This method provides minimum and maximum width measurements
+        for layout calculations.
+        
+        Args:
+            console: The console instance.
+            options: Console rendering options.
+            
+        Returns:
+            Tuple of (minimum_width, maximum_width).
+        """
+        # Calculate content dimensions
+        content_str = str(self.content) if self.content else ""
+        content_lines = content_str.split('\n') if content_str else [""]
+        
+        # Calculate content width
+        content_width = max(
+            (self._get_display_width(line) for line in content_lines),
+            default=0
+        )
+        
+        # Consider title and subtitle
+        title_width = 0
+        if self.title:
+            title_width = self._get_display_width(self.title) + 4
+        if self.subtitle:
+            title_width = max(title_width, self._get_display_width(self.subtitle) + 4)
+        
+        total_content_width = max(content_width, title_width)
+        
+        # Add padding and borders
+        min_width = total_content_width + self.padding.total_horizontal
+        if self.border_style != BorderStyle.NONE:
+            min_width += 2
+        
+        # Apply constraints
+        min_width = max(min_width, self.min_width)
+        max_width = min_width
+        
+        if self.expand:
+            max_width = self.terminal_width
+        
+        if self.max_width:
+            max_width = min(max_width, self.max_width)
+        
+        return min_width, max_width
+    
+    def __str__(self) -> str:
+        """Return rendered panel as string."""
+        return self.render()
+    
+    def __repr__(self) -> str:
+        """Return panel representation."""
+        content_preview = str(self.content)[:30] if self.content else ""
+        if len(str(self.content or "")) > 30:
+            content_preview += "..."
+        return f"Panel({content_preview!r}, title={self.title!r})"
+    
+
     def _get_style_value(self, key: str, default: Any = None) -> Any:
         """Get a style value from theme or direct attribute."""
         if self.theme and key in self.theme:

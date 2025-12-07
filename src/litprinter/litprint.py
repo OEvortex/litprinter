@@ -1,64 +1,236 @@
+#!/usr/bin/env python3
 """
->>> from litprinter import litprint
->>>
->>> litprint("Hello, world!")
-ic| "Hello, world!"
->>>
->>> def my_function(a, b):
-...    litprint(a, b)
->>> my_function(1, 2)
-ic| a: 1, b: 2
+LitPrinter - IceCream-compatible Debug Printing
 
-This module provides the 'litprint' function, which is an enhanced print function for
-debugging purposes. It leverages the LITPrintDebugger class from 'core.py' and allows
-for configurable prefix, output functions, and context inclusion. It's designed
-to make debugging more straightforward by offering clear output with context information.
+This module provides ic-style debug printing with Rich formatting.
+It's a drop-in replacement for IceCream with additional features.
+
+Usage:
+    from litprinter import ic
+    
+    x = 42
+    ic(x)  # Output: ic| x: 42
+    
+    # Configure output
+    ic.configureOutput(prefix='DEBUG| ')
+    
+    # Enable/disable
+    ic.disable()
+    ic.enable()
+    
+    # Format without printing
+    s = ic.format(x)
+
+Author: OEvortex <helpingai5@gmail.com>
+License: MIT
 """
-from typing import Any, Callable
-from .core import LITPrintDebugger
-
-#: The main instance of LITPrintDebugger for enhanced printing.
-
-# Wrapper to allow per-call context control
-_LIT_INSTANCE = LITPrintDebugger()
 
 import inspect
-def _lit_wrapper(*args, **kwargs):
-    # Allow per-call includeContext/contextAbsPath
-    includeContext = kwargs.pop('includeContext', None)
-    contextAbsPath = kwargs.pop('contextAbsPath', None)
-    orig_includeContext = _LIT_INSTANCE.includeContext
-    orig_contextAbsPath = _LIT_INSTANCE.contextAbsPath
-    if includeContext is not None:
-        _LIT_INSTANCE.includeContext = includeContext
-    if contextAbsPath is not None:
-        _LIT_INSTANCE.contextAbsPath = contextAbsPath
-    try:
-        # Use the original __call__, but pass the correct frame for context
-        frame = inspect.currentframe()
-        user_frame = frame.f_back
-        # Patch: temporarily override inspect.currentframe to return user_frame
-        orig_currentframe = inspect.currentframe
-        inspect.currentframe = lambda: user_frame
+from typing import Any, Callable, Optional, Union
+
+from .core import IceCreamDebugger, argumentToString, _colorized_stderr_print, set_style, get_style
+
+
+# ============================================================================
+# Module-level IC Instance
+# ============================================================================
+
+class _IceCreamWrapper:
+    """Wrapper class that provides both callable and method access.
+    
+    This allows:
+        ic(x)  # Call like a function
+        ic.configureOutput(...)  # Access methods
+        ic.disable() / ic.enable()  # Toggle
+    """
+    
+    def __init__(self):
+        self._debugger = IceCreamDebugger()
+    
+    def __call__(self, *args, includeContext: Optional[bool] = None, 
+                 contextAbsPath: Optional[bool] = None) -> Any:
+        """Debug print arguments and return them.
+        
+        Args:
+            *args: Values to debug print.
+            includeContext: Override context setting for this call.
+            contextAbsPath: Override path setting for this call.
+            
+        Returns:
+            None if no args, single arg if one arg, tuple if multiple.
+        """
+        # Save original settings for per-call overrides
+        orig_context = self._debugger._includeContext
+        orig_abs_path = self._debugger._contextAbsPath
+        
         try:
-            # If context is requested, call _format directly for correct arg names
-            if _LIT_INSTANCE.includeContext:
-                output = _LIT_INSTANCE._format(user_frame, *args)
-                _LIT_INSTANCE.outputFunction(output)
+            # Apply per-call overrides
+            if includeContext is not None:
+                self._debugger._includeContext = includeContext
+            if contextAbsPath is not None:
+                self._debugger._contextAbsPath = contextAbsPath
+            
+            if not self._debugger.enabled:
+                # Return passthrough even when disabled
                 if not args:
                     return None
                 elif len(args) == 1:
                     return args[0]
                 else:
                     return args
+            
+            # Get the caller's frame
+            call_frame = inspect.currentframe().f_back
+            
+            # Format and output
+            output = self._debugger._format(call_frame, *args)
+            self._debugger._outputFunction(output)
+            
+            # Return passthrough
+            if not args:
+                return None
+            elif len(args) == 1:
+                return args[0]
             else:
-                return _LIT_INSTANCE.__call__(*args, **kwargs)
+                return args
+                
         finally:
-            inspect.currentframe = orig_currentframe
-    finally:
-        _LIT_INSTANCE.includeContext = orig_includeContext
-        _LIT_INSTANCE.contextAbsPath = orig_contextAbsPath
+            # Restore original settings
+            self._debugger._includeContext = orig_context
+            self._debugger._contextAbsPath = orig_abs_path
+    
+    def format(self, *args) -> str:
+        """Format arguments without printing.
+        
+        Args:
+            *args: Values to format.
+            
+        Returns:
+            Formatted string.
+        """
+        call_frame = inspect.currentframe().f_back
+        return self._debugger._format(call_frame, *args)
+    
+    def configureOutput(
+        self,
+        prefix: Union[str, Callable[[], str], None] = None,
+        outputFunction: Optional[Callable[[str], None]] = None,
+        argToStringFunction: Optional[Callable[[Any], str]] = None,
+        includeContext: Optional[bool] = None,
+        contextAbsPath: Optional[bool] = None,
+    ) -> None:
+        """Configure output settings.
+        
+        Args:
+            prefix: Prefix string or callable returning prefix.
+            outputFunction: Function to call with formatted output.
+            argToStringFunction: Function to convert args to strings.
+            includeContext: Whether to show file/line/function.
+            contextAbsPath: Whether to use absolute paths.
+        """
+        self._debugger.configureOutput(
+            prefix=prefix,
+            outputFunction=outputFunction,
+            argToStringFunction=argToStringFunction,
+            includeContext=includeContext,
+            contextAbsPath=contextAbsPath,
+        )
+    
+    def enable(self) -> None:
+        """Enable debug output."""
+        self._debugger.enable()
+    
+    def disable(self) -> None:
+        """Disable debug output."""
+        self._debugger.disable()
+    
+    @property
+    def enabled(self) -> bool:
+        """Check if debugging is enabled."""
+        return self._debugger.enabled
+    
+    def __repr__(self) -> str:
+        return f"<ic enabled={self.enabled}>"
 
-LIT = _lit_wrapper
-litprint = _lit_wrapper
-ic = _lit_wrapper
+
+# ============================================================================
+# Module-level Instances and Aliases
+# ============================================================================
+
+# The main ic instance
+ic = _IceCreamWrapper()
+
+# Aliases for compatibility
+LIT = ic
+litprint = ic
+lit = ic
+
+# Module-level convenience functions
+def configureOutput(
+    prefix: Union[str, Callable[[], str], None] = None,
+    outputFunction: Optional[Callable[[str], None]] = None,
+    argToStringFunction: Optional[Callable[[Any], str]] = None,
+    includeContext: Optional[bool] = None,
+    contextAbsPath: Optional[bool] = None,
+) -> None:
+    """Configure the global ic output settings.
+    
+    Args:
+        prefix: Prefix string or callable.
+        outputFunction: Output function.
+        argToStringFunction: Argument formatting function.
+        includeContext: Whether to include context.
+        contextAbsPath: Whether to use absolute paths.
+    """
+    ic.configureOutput(
+        prefix=prefix,
+        outputFunction=outputFunction,
+        argToStringFunction=argToStringFunction,
+        includeContext=includeContext,
+        contextAbsPath=contextAbsPath,
+    )
+
+
+def enable() -> None:
+    """Enable debug output globally."""
+    ic.enable()
+
+
+def disable() -> None:
+    """Disable debug output globally."""
+    ic.disable()
+
+
+def format(*args) -> str:
+    """Format arguments without printing.
+    
+    Args:
+        *args: Values to format.
+        
+    Returns:
+        Formatted string.
+    """
+    call_frame = inspect.currentframe().f_back
+    return ic._debugger._format(call_frame, *args)
+
+
+# ============================================================================
+# Exports
+# ============================================================================
+
+__all__ = [
+    # Main instance
+    'ic',
+    # Aliases
+    'LIT',
+    'litprint', 
+    'lit',
+    # Functions
+    'configureOutput',
+    'enable',
+    'disable',
+    'format',
+    # Core exports
+    'argumentToString',
+    'IceCreamDebugger',
+]

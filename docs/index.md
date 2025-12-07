@@ -2,7 +2,7 @@
 
 Welcome to the LitPrinter documentation!
 
-LitPrinter is the most sophisticated debug printing library for Python with rich formatting, syntax highlighting, and beautiful tracebacks. It's designed to make debugging more pleasant and productive with features like context-aware output, smart formatting, and powerful traceback handling.
+LitPrinter is the most sophisticated debug printing library for Python - a powerful fusion of **IceCream** and **Rich** with beautiful formatting, syntax highlighting, and gorgeous tracebacks.
 
 ## Installation
 
@@ -10,323 +10,280 @@ LitPrinter is the most sophisticated debug printing library for Python with rich
 pip install litprinter
 ```
 
-## Basic Usage
+## Quick Start
 
 ```python
-from litprinter import litprint, lit
+from litprinter import ic
 
-# Basic usage
-litprint("Hello, world!")
-# Output: LIT -> [script.py:3] in () >>> Hello, world!
+x = 42
+ic(x)  # Output: ic| x: 42
+```
 
-# Print variables with their names
+That's it! LitPrinter automatically shows both the variable name and its value.
+
+## Why LitPrinter?
+
+LitPrinter combines the best of two worlds:
+
+| Feature | print() | IceCream | LitPrinter |
+|---------|---------|----------|------------|
+| Shows variable names | ❌ | ✅ | ✅ |
+| Syntax highlighting | ❌ | ❌ | ✅ |
+| Rich-style panels | ❌ | ❌ | ✅ |
+| Pretty tracebacks | ❌ | ❌ | ✅ |
+| Context (file/line) | ❌ | ✅ | ✅ |
+| Configurable output | ❌ | ✅ | ✅ |
+| Enable/disable | ❌ | ✅ | ✅ |
+
+## Core Features
+
+### IceCream-Compatible API
+
+```python
+from litprinter import ic
+
+# Basic usage - shows variable names and values
 x, y = 10, 20
-lit(x, y)
-# Output: LIT -> [script.py:7] in () >>> x: 10, y: 20
+ic(x, y)  # Output: ic| x: 10, y: 20
 
-# Use in functions
-def my_function(a, b):
-    lit(a, b)
-    return a + b
+# Works with expressions
+ic(x * 2)  # Output: ic| x * 2: 20
 
-result = my_function(5, 10)
-# Output: LIT -> [script.py:12] in my_function() >>> a: 5, b: 10
+# Empty call shows timestamp
+ic()  # Output: ic| 11:30:47.532
+
+# Returns values for inline use
+result = ic(calculate(x))  # Prints AND returns the value
 ```
 
-## Features
-
-- Variable inspection with expression display
-- Return value handling for inline usage
-- Support for custom formatters for specific data types
-- Execution context tracking
-- Rich-like colorized output with multiple themes (JARVIS, RICH, MODERN, NEON, CYBERPUNK, DRACULA, MONOKAI)
-- Better JSON formatting with indent=2 by default
-- Advanced pretty printing for complex data structures with smart truncation
-- Clickable file paths in supported terminals and editors (VSCode compatible)
-- Enhanced visual formatting with better spacing and separators
-- Special formatters for common types (Exception, bytes, set, frozenset, etc.)
-- Smart object introspection for custom classes
-- Logging capabilities with timestamp and log levels
-- **Performance optimizations** with style caching system
-- **Cross-platform compatibility** with enhanced Windows support and colorama integration
-- **Memory management** with cache control utilities
-- **Standards compliance** with NO_COLOR environment variable support
-- **Robust error handling** with graceful fallbacks for invalid styles
-
-## API Reference
-
-### Main Functions
-
-#### litprint
+### Configuration
 
 ```python
-from litprinter import litprint
+from litprinter import ic
 
-litprint(*args, **kwargs)
+# Change the prefix
+ic.configureOutput(prefix='DEBUG| ')
+ic(x)  # Output: DEBUG| x: 10
+
+# Show file/line/function context
+ic.configureOutput(includeContext=True)
+ic(x)  # Output: DEBUG| [script.py:5 in my_function()] >>> x: 10
+
+# Use absolute paths
+ic.configureOutput(contextAbsPath=True)
+ic(x)  # Output: DEBUG| [C:\Users\koula\Desktop\litprinter\test_ic.py:5 in my_function()] >>> x: 10
+
+# Custom output function (e.g., to a logger)
+ic.configureOutput(outputFunction=my_logger.debug)
+ic(x)  # Output: DEBUG| x: 10
+
+# Custom argument formatting
+ic.configureOutput(argToStringFunction=my_formatter)
+ic(x)  # Output: DEBUG| x: 10
 ```
 
-The `litprint` function is an enhanced print function for debugging purposes. It displays the values of the provided arguments along with context information (file, line number, function name).
-
-Key parameters:
-- `prefix`: Custom prefix for output lines (default: "LIT -> ")
-- `includeContext`: Show file/line/function context (default: True)
-- `contextAbsPath`: Use absolute paths in context (default: False)
-- `disable_colors`: Turn off syntax highlighting (default: False)
-- `log_file`: File to write output to (default: None)
-- `log_timestamp`: Include timestamps in output (default: False)
-
-#### lit
+### Enable/Disable
 
 ```python
-from litprinter import lit
+from litprinter import ic
 
-lit(*args, **kwargs)
+# Disable output (values still pass through)
+ic.disable()
+result = ic(calculate())  # Silent, but returns value
+
+# Re-enable output
+ic.enable()
+ic("I'm back!")  # Output: ic| "I'm back!"
 ```
 
-The `lit` function is similar to `litprint` but with enhanced variable inspection. It shows both the variable names and their values.
-
-It accepts the same parameters as `litprint` and returns the last argument, making it suitable for inline usage.
-
-#### log
+### Format Without Printing
 
 ```python
-from litprinter import log
+from litprinter import ic
 
-log(*args, level="debug", **kwargs)
+# Get formatted string without printing
+formatted = ic.format(x, y)
+my_logger.debug(formatted)
+ic(x)  # Output: DEBUG| x: 10
 ```
 
-The `log` function is a logging utility that adds timestamp and log level information to the output.
-
-Key parameters:
-- `level`: Log level ("debug", "info", "warning", "error", "critical")
-- All parameters from `litprint` are also supported
-
-#### install/uninstall
+### Per-Call Context Override
 
 ```python
-from litprinter import install, uninstall
+from litprinter import ic
 
-install(name="litprint", ic="ic")
-uninstall(name="litprint", ic="ic")
+# Override includeContext for a single call
+ic(x, includeContext=True)  # Shows context for this call only
 ```
 
-These functions install/uninstall LitPrinter functions into the Python builtins module, making them available globally without imports.
+## Rich-Style Console
 
-- `name`: Name of the function to install in builtins (default: "litprint")
-- `ic`: Name of the icecream-compatible function to install (default: "ic")
-
-### Themes and Styling
+LitPrinter includes a Rich-compatible Console for styled output:
 
 ```python
-from litprinter import JARVIS, RICH, MODERN, NEON, CYBERPUNK, DRACULA, MONOKAI, create_custom_style
+from litprinter import Console
 
-# Use a predefined theme
-lit.style = NEON
+console = Console()
 
-# Create a custom theme
-my_style = create_custom_style(
-    primary_color="#FF5733",
-    secondary_color="#33FF57",
-    accent_color="#5733FF"
-)
-lit.style = my_style
+# Rich-style markup
+console.print("[bold red]Error:[/bold red] Something went wrong!")
+
+# Log with timestamp and location
+console.log("Processing started")
+
+# Horizontal rules
+console.rule("Section Header")
+
+# JSON with highlighting
+console.print_json({"name": "Alice", "age": 30})
 ```
 
-LitPrinter comes with several built-in themes:
-
-- **JARVIS**: A Tron-inspired theme with black background and vibrant cyan/green/magenta highlights
-- **RICH**: A rich-text inspired theme with balanced colors for good readability
-- **MODERN**: A modern theme with subtle colors and good contrast
-- **NEON**: A vibrant neon theme with bright colors on dark background
-- **CYBERPUNK**: A cyberpunk-inspired theme with bright pinks, blues, and yellows
-- **DRACULA**: A dark theme inspired by the popular Dracula color scheme
-- **MONOKAI**: A theme based on the classic Monokai color scheme
-
-You can also create custom themes using the `create_custom_style` function, which allows you to specify colors for different syntax elements.
-
-### Builtins Integration
+## Beautiful Panels
 
 ```python
-from litprinter import install, uninstall
+from litprinter import Panel
 
-# Install to builtins
-install()
+# Basic panel
+panel = Panel("Hello, World!", title="Greeting")
+print(panel)
+# Output:
+# ╭ Greeting ────────╮
+# │ Hello, World!    │
+# ╰──────────────────╯
 
-# Now you can use ic() directly
-ic("This works without import!")
-
-# Uninstall from builtins
-uninstall()
+# Fitted panel (doesn't expand)
+panel = Panel.fit("Short text", title="Fitted")
 ```
 
-## Advanced Usage
-
-### Traceback Enhancement
-
-LitPrinter includes a powerful traceback enhancement module that makes Python's error messages more readable and informative:
+## Pretty Tracebacks
 
 ```python
 from litprinter.traceback import install
 
-# Basic installation
-install()
-
-# Advanced configuration
+# Install globally
 install(
-    theme="CYBERPUNK",       # Choose from JARVIS, RICH, MODERN, NEON, CYBERPUNK, DRACULA, MONOKAI
-    show_locals=True,        # Show local variables in each frame
-    extra_lines=3,           # Show extra context lines around error
-    locals_max_length=150,   # Limit local variable display length
-    locals_max_depth=3,      # How deep to format nested structures
-    locals_hide_dunder=True, # Hide __dunder__ variables
-    width=120                # Terminal width for formatting
+    theme="cyberpunk",      # Color theme
+    show_locals=True,       # Show local variables
+    extra_lines=3,          # Context around error
 )
+
+# Now all exceptions show beautiful tracebacks!
 ```
 
-### Custom Formatters
+## Builtins Installation
 
-You can register custom formatters for your own types:
+Make `ic()` available globally without imports:
+
+```python
+from litprinter.builtins import install
+
+install()
+
+# Now works anywhere without import:
+ic(x)  # Available globally!
+```
+
+## API Reference
+
+### `ic(*args, **kwargs)`
+
+Debug print arguments and return them.
+
+**Parameters:**
+- `*args`: Values to debug print
+- `includeContext`: Override context setting for this call
+- `contextAbsPath`: Override path setting for this call
+
+**Returns:** 
+- `None` if no args
+- Single value if one arg
+- Tuple if multiple args
+
+### `ic.configureOutput(**kwargs)`
+
+Configure output settings.
+
+**Parameters:**
+- `prefix`: String or callable returning prefix
+- `outputFunction`: Function to call with formatted output
+- `argToStringFunction`: Function to convert args to strings
+- `includeContext`: Show file/line/function context
+- `contextAbsPath`: Use absolute paths in context
+
+### `ic.enable()` / `ic.disable()`
+
+Enable or disable debug output. When disabled, `ic()` still returns values but produces no output.
+
+### `ic.format(*args)`
+
+Format arguments without printing. Returns the formatted string.
+
+### `argumentToString(obj)`
+
+Convert an object to string representation. Supports singledispatch for custom types:
 
 ```python
 from litprinter import argumentToString
 
-class MyCustomClass:
-    def __init__(self, id, name):
-        self.id = id
+class MyClass:
+    def __init__(self, name):
         self.name = name
 
-@argumentToString.register(MyCustomClass)
-def format_my_class(obj):
-    return f"MyClass(id={obj.id}, name='{obj.name}')"
-
-# Now LitPrinter will use your custom formatter
-my_obj = MyCustomClass(42, "Example")
-lit(my_obj)  # Will display using your custom formatter
+@argumentToString.register(MyClass)
+def format_myclass(obj):
+    return f"MyClass({obj.name})"
 ```
 
-### Logging to File
+## Available Themes
 
-You can log output to a file in addition to the console:
+For tracebacks and syntax highlighting:
+
+- **JARVIS** - Inspired by Iron Man's AI
+- **RICH** - Balanced and readable
+- **MODERN** - Subtle with good contrast
+- **NEON** - Vibrant neon colors
+- **CYBERPUNK** - Pinks, blues, and yellows
+- **DRACULA** - Popular dark theme
+- **MONOKAI** - Classic color scheme
+- **SOLARIZED** - Low-contrast theme
+- **NORD** - Arctic-inspired colors
+- **GITHUB** - GitHub's color scheme
+- **VSCODE** - VS Code inspired
+- **MATERIAL** - Material design colors
+- **RETRO** - Nostalgic colors
+- **OCEAN** - Cool blue tones
+- **AUTUMN** - Warm fall colors
+- **SYNTHWAVE** - 80s inspired
+- **FOREST** - Natural greens
+- **MONOCHROME** - Black and white
+- **SUNSET** - Warm orange tones
+
+## Migration from IceCream
+
+LitPrinter is a drop-in replacement for IceCream:
 
 ```python
-from litprinter import lit
+# Before
+from icecream import ic
 
-# Log to both console and file
-lit("Important debug info", log_file="debug.log", log_timestamp=True)
+# After
+from litprinter import ic
 ```
 
-### Performance and System Utilities
+All IceCream features work identically:
+- `ic(x)` - Debug print
+- `ic.configureOutput(...)` - Configure
+- `ic.disable()` / `ic.enable()` - Toggle
+- `ic.format(...)` - Format without print
 
-LitPrinter includes several utility functions for performance management and system compatibility:
+Plus you get:
+- Syntax highlighting
+- Rich-style panels and console
+- Beautiful tracebacks
+- 19 color themes
 
-```python
-from litprinter.core import clearStyleCache, getStyleCacheInfo, isTerminalCapable
+## Version
 
-# Check cache status
-cache_info = getStyleCacheInfo()
-print(f"Cache size: {cache_info['cache_size']}")
-print(f"Cached styles: {cache_info['cached_styles']}")
+Current version: **0.3.0**
 
-# Clear cache for memory management
-clearStyleCache()
-
-# Check terminal capabilities (respects NO_COLOR environment variable)
-if isTerminalCapable():
-    print("Terminal supports colors")
-else:
-    print("Terminal does not support colors or NO_COLOR is set")
-```
-
-#### Available Utility Functions
-
-| Function | Description |
-|----------|-------------|
-| `clearStyleCache()` | Clear the style formatter cache for memory management |
-| `getStyleCacheInfo()` | Get cache statistics and currently cached styles |
-| `isTerminalCapable()` | Check if terminal supports color output (respects NO_COLOR standard) |
-
-### Cross-Platform Compatibility
-
-LitPrinter automatically handles cross-platform differences and provides robust compatibility features:
-
-```python
-# LitPrinter automatically handles cross-platform differences:
-# - Detects Windows terminal capabilities and initializes colorama
-# - Respects NO_COLOR environment variable standard
-# - Uses proper path normalization across platforms
-# - Gracefully falls back to plain text when colors aren't supported
-
-import os
-os.environ['NO_COLOR'] = '1'  # Disable colors globally
-lit("This will be plain text")  # No colors will be applied
-```
-
-**Cross-platform features:**
-- Windows terminal detection with automatic colorama initialization
-- NO_COLOR environment variable support for accessibility
-- Cross-platform path normalization using `os.path.normpath()`
-- Graceful fallbacks when color support is unavailable
-- Robust error handling for different terminal environments
-
-### Integration with VS Code
-
-LitPrinter creates clickable links in supported terminals and editors. In VS Code, clicking on the file path in the output will open the file at the exact line.
-
-```python
-lit(data, contextAbsPath=True)  # Creates clickable link to source line
-```
-
-## Recent Improvements
-
-### Code Quality & Performance (v0.2.0)
-- **90% Code Duplication Eliminated**: Consolidated `lit.py` and `litprint.py` implementations
-- **Enhanced Cross-Platform Support**: Improved Windows terminal detection and colorama integration
-- **Performance Optimizations**: Added style caching system for better performance
-- **Memory Management**: New cache control functions for production environments
-- **Standards Compliance**: Full NO_COLOR environment variable support
-- **Robust Error Handling**: Graceful fallbacks for invalid styles and edge cases
-- **Import Fixes**: Resolved module import issues for better package compatibility
-
-These improvements make LitPrinter more maintainable, performant, and reliable across different platforms and environments.
-
-### Traceback Module API
-
-```python
-from litprinter.traceback import install, uninstall, PrettyTraceback
-```
-
-#### install
-
-```python
-install(theme="RICH", show_locals=True, extra_lines=2, **kwargs)
-```
-
-Replaces Python's default traceback handler with LitPrinter's enhanced version.
-
-Key parameters:
-- `theme`: Color theme to use ("JARVIS", "RICH", "MODERN", "NEON", "CYBERPUNK", "DRACULA", "MONOKAI")
-- `show_locals`: Whether to show local variables in each frame
-- `extra_lines`: Number of context lines to show around the error
-- `locals_max_length`: Maximum length for local variable display
-- `locals_max_depth`: Maximum depth for nested structures
-- `locals_hide_dunder`: Whether to hide __dunder__ variables
-- `width`: Terminal width for formatting
-
-#### uninstall
-
-```python
-uninstall()
-```
-
-Restores Python's original traceback handler.
-
-#### PrettyTraceback
-
-```python
-tb = PrettyTraceback(exc_type, exc_value, traceback, **kwargs)
-tb.print()
-```
-
-Creates a traceback formatter instance for one-time use. Accepts the same parameters as `install()`.
-
-For more advanced usage examples, see the [README.md](https://github.com/OEvortex/litprinter).
+For more examples, see the [GitHub repository](https://github.com/OEvortex/litprinter).

@@ -1,18 +1,30 @@
+#!/usr/bin/env python3
 """
->>> from litprinter.core import LITPrintDebugger
->>>
->>> debugger = LITPrintDebugger(prefix="DEBUG >>> ")
->>> debugger("Hello", "world!")
-DEBUG >>> [__main__.py:3] in () >>> Hello, world!
->>> debugger.format("Formatted output")
-'DEBUG >>> [__main__.py:5] in () >>> Formatted output'
->>>
-This module contains the core logic for the litprint and lit functions.
-It includes the LITPrintDebugger class, which is responsible for formatting
-and outputting debug information, source code analysis for variable
-names, colorizing output, and configurable options.
+LitPrinter Core Module
+
+This module provides the IceCreamDebugger class - a powerful debugging utility
+that combines the simplicity of IceCream with Rich-style formatting.
+
+Features:
+- Variable inspection with expression display
+- Configurable output formatting
+- Enable/disable debugging output
+- Rich-style colorized output
+- Context information (file, line, function)
+
+Usage:
+    from litprinter import ic
+    
+    x = 42
+    ic(x)  # Output: ic| x: 42
+    
+    ic.configureOutput(prefix='DEBUG| ', includeContext=True)
+    ic()   # Output: DEBUG| script.py:10 in my_function()
+
+Author: OEvortex <helpingai5@gmail.com>
+License: MIT
 """
-#!/usr/bin/env python
+
 from __future__ import print_function
 from datetime import datetime
 from contextlib import contextmanager
@@ -25,459 +37,587 @@ import sys
 import warnings
 import functools
 import json
+from typing import Any, List, Type, Optional, Dict, Callable, Union
 
+# Optional imports
 try:
     import colorama
-except ImportError:  # pragma: no cover - optional dependency
+    HAS_COLORAMA = True
+except ImportError:
     colorama = None
+    HAS_COLORAMA = False
 
 try:
     import executing
-except ImportError as exc:  # pragma: no cover - required
+except ImportError as exc:
     raise ImportError(
-        "The 'executing' package is required for litprinter."
+        "The 'executing' package is required for litprinter. "
+        "Install it with: pip install executing"
     ) from exc
-from pygments import highlight
-from pygments.formatters import Terminal256Formatter
-from pygments.lexers import PythonLexer as PyLexer, Python3Lexer as Py3Lexer
-from typing import Any, List, Type, Optional, Dict, Callable
-from .coloring import CyberpunkStyle
 
-_absent = object()
+try:
+    from pygments import highlight
+    from pygments.formatters import Terminal256Formatter
+    from pygments.lexers import Python3Lexer
+    HAS_PYGMENTS = True
+except ImportError:
+    HAS_PYGMENTS = False
+    highlight = None
+    Terminal256Formatter = None
+    Python3Lexer = None
 
-def bindStaticVariable(name, value):
-    def decorator(fn):
-        setattr(fn, name, value)
-        return fn
-    return decorator
+try:
+    from .coloring import CyberpunkStyle
+except ImportError:
+    CyberpunkStyle = None
 
-@bindStaticVariable('formatter', Terminal256Formatter(style=CyberpunkStyle))
-@bindStaticVariable(
-    'lexer', Py3Lexer(ensurenl=False))
-def colorize(s):
-    self = colorize
-    return highlight(s, self.lexer, self.formatter)
+# Sentinel for absent values
+_ABSENT = object()
+
+# Default configuration
+DEFAULT_PREFIX = 'ic| '
+DEFAULT_OUTPUT_FUNCTION = lambda s: print(s, file=sys.stderr)
+DEFAULT_ARG_TO_STRING_FUNCTION = pprint.pformat
+DEFAULT_CONTEXT_DELIMITER = ' - '
+DEFAULT_LINE_WRAP_WIDTH = 70
+
+NO_SOURCE_WARNING = (
+    "Failed to access source code for analysis. "
+    "Was ic() called in a REPL or frozen application?"
+)
+
+
+# ============================================================================
+# Colorization Utilities
+# ============================================================================
+
+# Current style (can be changed)
+_current_style = None
+
+def set_style(style):
+    """Set the syntax highlighting style.
+    
+    Args:
+        style: A Pygments Style class (e.g., SolarizedDark, LitStyle, CyberpunkStyle)
+    """
+    global _current_style
+    _current_style = style
+
+
+def get_style():
+    """Get the current syntax highlighting style."""
+    global _current_style
+    if _current_style is None:
+        try:
+            from .coloring import DEFAULT_STYLE
+            _current_style = DEFAULT_STYLE
+        except ImportError:
+            _current_style = None
+    return _current_style
+
 
 @contextmanager
-def supportTerminalColorsInWindows():
-    colorama.init()
-    yield
-    colorama.deinit()
+def _windows_color_support():
+    """Enable color support on Windows terminals."""
+    if HAS_COLORAMA:
+        colorama.init()
+        try:
+            yield
+        finally:
+            colorama.deinit()
+    else:
+        yield
 
-def stderrPrint(*args):
-    print(*args, file=sys.stderr)
 
-def isLiteral(s):
+def _create_formatter():
+    """Create a Pygments formatter with the current style."""
+    if not HAS_PYGMENTS:
+        return None
+    
+    style = get_style()
+    if style:
+        return Terminal256Formatter(style=style)
+    return Terminal256Formatter()
+
+
+def _colorize(text: str) -> str:
+    """Apply syntax highlighting to text."""
+    if not HAS_PYGMENTS:
+        return text
+    
     try:
-        ast.literal_eval(s)
+        formatter = _create_formatter()
+        lexer = Python3Lexer(ensurenl=False)
+        return highlight(text, lexer, formatter).rstrip()
     except Exception:
-        return False
-    return True
+        return text
 
-def colorizedStderrPrint(s):
-    colored = colorize(s)
-    with supportTerminalColorsInWindows():
-        stderrPrint(colored)
 
-def styledLitPrint(s):
-    colored = colorize(s)
-    with supportTerminalColorsInWindows():
-        stderrPrint(colored)
+def _colorized_stderr_print(text: str) -> None:
+    """Print colorized text to stderr."""
+    colored = _colorize(text)
+    with _windows_color_support():
+        print(colored, file=sys.stderr)
 
-DEFAULT_PREFIX = 'LIT| '
-DEFAULT_LINE_WRAP_WIDTH = 70
-DEFAULT_CONTEXT_DELIMITER = '- '
-DEFAULT_OUTPUT_FUNCTION = colorizedStderrPrint
-DEFAULT_ARG_TO_STRING_FUNCTION = pprint.pformat
-NO_SOURCE_AVAILABLE_WARNING_MESSAGE = (
-    'Failed to access the underlying source code for analysis. Was litprint() '
-    'invoked in a REPL (e.g. from the command line), a frozen application '
-    '(e.g. packaged with PyInstaller), or did the underlying source code '
-    'change during execution?')
 
-def callOrValue(obj):
-    return obj() if callable(obj) else obj
+# ============================================================================
+# Source Code Analysis
+# ============================================================================
 
 class Source(executing.Source):
-    def get_text_with_indentation(self, node):
+    """Extended Source class for extracting expression text."""
+    
+    def get_text_with_indentation(self, node) -> str:
+        """Get the source text of a node, handling indentation."""
         result = self.asttokens().get_text(node)
         if '\n' in result:
             result = ' ' * node.first_token.start[1] + result
             result = dedent(result)
-        result = result.strip()
-        return result
+        return result.strip()
 
-def prefixLines(prefix, s, startAtLine=0):
-    lines = s.splitlines()
-    for i in range(startAtLine, len(lines)):
-        lines[i] = prefix + lines[i]
-    return lines
 
-def prefixFirstLineIndentRemaining(prefix, s):
-    indent = ' ' * len(prefix)
-    lines = prefixLines(indent, s, startAtLine=1)
-    lines[0] = prefix + lines[0]
-    return lines
+def _is_literal(s: str) -> bool:
+    """Check if a string represents a Python literal."""
+    try:
+        ast.literal_eval(s)
+        return True
+    except Exception:
+        return False
 
-def formatPair(prefix, arg, value):
-    if arg is _absent:
-        argLines = []
-        valuePrefix = prefix
-    else:
-        argLines = prefixFirstLineIndentRemaining(prefix, arg)
-        valuePrefix = argLines[-1] + ': '
 
-    looksLikeAString = (value[0] + value[-1]) in ["''", '""']
-    if looksLikeAString:
-        valueLines = prefixLines(' ', value, startAtLine=1)
-        value = '\n'.join(valueLines)
+# ============================================================================
+# Argument Formatting
+# ============================================================================
 
-    valueLines = prefixFirstLineIndentRemaining(valuePrefix, value)
-    lines = argLines[:-1] + valueLines
-    return '\n'.join(lines)
-
-def singledispatch(func):
-    func = functools.singledispatch(func)
-    closure = dict(zip(func.register.__code__.co_freevars,
-                       func.register.__closure__))
-    registry = closure['registry'].cell_contents
-    dispatch_cache = closure['dispatch_cache'].cell_contents
-    def unregister(cls):
-        del registry[cls]
-        dispatch_cache.clear()
-    func.unregister = unregister
-    return func
-
-@singledispatch
-def argumentToString(obj):
+@functools.singledispatch
+def argumentToString(obj: Any) -> str:
+    """Convert an argument to a string representation.
+    
+    This function uses singledispatch to allow registering custom
+    formatters for different types.
+    
+    Args:
+        obj: The object to format.
+        
+    Returns:
+        String representation of the object.
+    """
     s = DEFAULT_ARG_TO_STRING_FUNCTION(obj)
-    s = s.replace('\\n', '\n')
-    return s
+    return s.replace('\\n', '\n')
+
 
 @argumentToString.register(str)
-def _(obj):
+def _format_str(obj: str) -> str:
+    """Format string objects."""
     if '\n' in obj:
         return "'''" + obj + "'''"
-    return "'" + obj.replace('\\', '\\\\') + "'"
+    return repr(obj)
 
-class LITPrintDebugger:
-    _pairDelimiter = ', '
-    lineWrapWidth = DEFAULT_LINE_WRAP_WIDTH
-    contextDelimiter = DEFAULT_CONTEXT_DELIMITER
-    
-    def __init__(self, prefix=DEFAULT_PREFIX,
-                 outputFunction=DEFAULT_OUTPUT_FUNCTION,
-                 argToStringFunction=argumentToString, includeContext=False,
-                 contextAbsPath=False):
-        self.enabled = True
-        self.prefix = prefix
-        self.includeContext = includeContext
-        self.outputFunction = outputFunction
-        self.argToStringFunction = argToStringFunction
-        self.contextAbsPath = contextAbsPath
 
-    def __call__(self, *args):
-        if self.enabled:
-            callFrame = inspect.currentframe().f_back
-            self.outputFunction(self._format(callFrame, *args))
-
-        if not args:
-            passthrough = None
-        elif len(args) == 1:
-            passthrough = args[0]
-        else:
-            passthrough = args
-        return passthrough
-
-    def format(self, *args):
-        callFrame = inspect.currentframe().f_back
-        out = self._format(callFrame, *args)
-        return out
-
-    def _format(self, callFrame, *args):
-        prefix = callOrValue(self.prefix)
-        context = self._formatContext(callFrame)
-        if not args:
-            time = self._formatTime()
-            out = prefix + context + time
-        else:
-            if self.includeContext:
-                # Format: LIT| [script.py:3] in calculate_total() >>> a: 10, b: 20
-                # prefix should be 'LIT| '
-                # context: '[script.py:3] in calculate_total()'
-                # delimiter: ' >>> '
-                # args: 'a: 10, b: 20'
-                # Compose output accordingly
-                # If user set a custom prefix, use it, else default to 'LIT| '
-                used_prefix = prefix if prefix.strip() else 'LIT| '
-                context_str = self._formatContext(callFrame)
-                args_str = self._formatArgs(callFrame, '', '', args)
-                # Remove any prefix/context from args_str
-                if args_str.startswith(prefix):
-                    args_str = args_str[len(prefix):]
-                if args_str.startswith(context_str):
-                    args_str = args_str[len(context_str):]
-                if args_str.startswith(self.contextDelimiter):
-                    args_str = args_str[len(self.contextDelimiter):]
-                out = f"{used_prefix}[{context_str}] >>> {args_str.strip()}"
-            else:
-                if not self.includeContext:
-                    context = ''
-                out = self._formatArgs(
-                    callFrame, prefix, context, args)
-        return out
-
-    def _formatArgs(self, callFrame, prefix, context, args):
-        callNode = Source.executing(callFrame).node
-        if callNode is not None:
-            source = Source.for_frame(callFrame)
-            sanitizedArgStrs = [
-                source.get_text_with_indentation(arg)
-                for arg in callNode.args]
-        else:
-            warnings.warn(
-                NO_SOURCE_AVAILABLE_WARNING_MESSAGE,
-                category=RuntimeWarning, stacklevel=4)
-            sanitizedArgStrs = [_absent] * len(args)
-        
-        pairs = list(zip(sanitizedArgStrs, args))
-        out = self._constructArgumentOutput(prefix, context, pairs)
-        return out
-
-    def _constructArgumentOutput(self, prefix, context, pairs):
-        def argPrefix(arg):
-            return '%s: ' % arg
-
-        pairs = [(arg, self.argToStringFunction(val)) for arg, val in pairs]
-        pairStrs = [
-            val if (isLiteral(arg) or arg is _absent)
-            else (argPrefix(arg) + val)
-            for arg, val in pairs]
-
-        allArgsOnOneLine = self._pairDelimiter.join(pairStrs)
-        multilineArgs = len(allArgsOnOneLine.splitlines()) > 1
-        contextDelimiter = self.contextDelimiter if context else ''
-        allPairs = prefix + context + contextDelimiter + allArgsOnOneLine
-        firstLineTooLong = len(allPairs.splitlines()[0]) > self.lineWrapWidth
-
-        if multilineArgs or firstLineTooLong:
-            if context:
-                lines = [prefix + context] + [
-                    formatPair(len(prefix) * ' ', arg, value)
-                    for arg, value in pairs
-                ]
-            else:
-                argLines = [
-                    formatPair('', arg, value)
-                    for arg, value in pairs
-                ]
-                lines = prefixFirstLineIndentRemaining(prefix, '\n'.join(argLines))
-        else:
-            lines = [prefix + context + contextDelimiter + allArgsOnOneLine]
-        return '\n'.join(lines)
-
-    def _formatContext(self, callFrame):
-        filename, lineNumber, parentFunction = self._getContext(callFrame)
-        if parentFunction != '<module>':
-            parentFunction = f'{parentFunction}()'
-        # Only return 'script.py:3] in calculate_total()' (no brackets)
-        context = f"{filename}:{lineNumber} in {parentFunction}"
-        return context
-
-    def _formatTime(self):
-        now = datetime.now()
-        formatted = now.strftime('%H:%M:%S.%f')[:-3]
-        return ' at %s' % formatted
-
-    def _getContext(self, callFrame):
-        frameInfo = inspect.getframeinfo(callFrame)
-        lineNumber = frameInfo.lineno
-        parentFunction = frameInfo.function
-        filepath = (realpath if self.contextAbsPath else basename)(frameInfo.filename)
-        return filepath, lineNumber, parentFunction
-
-    def enable(self):
-        self.enabled = True
-
-    def disable(self):
-        self.enabled = False
-
-    def configureOutput(self, prefix=_absent, outputFunction=_absent,
-                        argToStringFunction=_absent, includeContext=_absent,
-                        contextAbsPath=_absent):
-        noParameterProvided = all(
-            v is _absent for k, v in locals().items() if k != 'self')
-        if noParameterProvided:
-            raise TypeError('configureOutput() missing at least one argument')
-
-        if prefix is not _absent:
-            self.prefix = prefix
-        if outputFunction is not _absent:
-            self.outputFunction = outputFunction
-        if argToStringFunction is not _absent:
-            self.argToStringFunction = argToStringFunction
-        if includeContext is not _absent:
-            self.includeContext = includeContext
-        if contextAbsPath is not _absent:
-            self.contextAbsPath = contextAbsPath
-
-# Register special formatters for common types
 @argumentToString.register(type)
-def _format_type(obj, **kwargs):
-    """Format type objects nicely"""
+def _format_type(obj: type) -> str:
+    """Format type objects."""
     module = obj.__module__
     name = obj.__name__
     if module == 'builtins':
         return f"<class '{name}'>"
     return f"<class '{module}.{name}'>"
 
+
 @argumentToString.register(Exception)
-def _format_exception(obj, **kwargs):
-    """Format exceptions with traceback info"""
+def _format_exception(obj: Exception) -> str:
+    """Format exception objects."""
     return f"<{obj.__class__.__name__}: {str(obj)}>"
 
+
 @argumentToString.register(bytes)
-def _format_bytes(obj, **kwargs):
-    """Format bytes objects"""
+def _format_bytes(obj: bytes) -> str:
+    """Format bytes objects."""
     if len(obj) > 50:
-        return f"<bytes of length {len(obj)}>"
+        return f"<bytes len={len(obj)}>"
     try:
-        return f"b'{obj.decode('utf-8')}'"
-    except UnicodeDecodeError:
-        return f"<bytes of length {len(obj)}>"
+        return repr(obj)
+    except Exception:
+        return f"<bytes len={len(obj)}>"
+
 
 @argumentToString.register(dict)
-def _format_dict(obj, **kwargs):
-    """Format dictionary objects with better structure"""
+def _format_dict(obj: dict) -> str:
+    """Format dictionary objects."""
     if len(obj) > 50:
         return f"<dict with {len(obj)} items>"
+    
+    if not obj:
+        return "{}"
+    
+    # Small dicts with simple values on one line
+    if len(obj) <= 3:
+        simple = all(
+            isinstance(k, (str, int, float, bool)) and
+            isinstance(v, (str, int, float, bool, type(None)))
+            for k, v in obj.items()
+        )
+        if simple:
+            items = [f"{k!r}: {v!r}" for k, v in obj.items()]
+            return "{" + ", ".join(items) + "}"
+    
+    # Larger dicts with indentation
+    lines = []
+    for k, v in obj.items():
+        formatted_val = argumentToString(v)
+        if '\n' in formatted_val:
+            indented = formatted_val.replace('\n', '\n    ')
+            lines.append(f"  {k!r}: {indented}")
+        else:
+            lines.append(f"  {k!r}: {formatted_val}")
+    
+    return "{\n" + ",\n".join(lines) + "\n}"
 
-    try:
-        # For empty dict
-        if not obj:
-            return "{}"
 
-        # For small dicts with simple values, keep on one line
-        if len(obj) <= 3 and all(isinstance(k, (str, int, float, bool)) and
-                               isinstance(v, (str, int, float, bool))
-                               for k, v in obj.items()):
-            items = ["{!r}: {!r}".format(k, v) for k, v in obj.items()]
-            return "{{ {} }}".format(", ".join(items))
+@argumentToString.register(list)
+def _format_list(obj: list) -> str:
+    """Format list objects."""
+    if len(obj) > 50:
+        return f"<list with {len(obj)} items>"
+    
+    if not obj:
+        return "[]"
+    
+    # Small lists with simple values on one line
+    if len(obj) <= 5:
+        simple = all(isinstance(x, (str, int, float, bool, type(None))) for x in obj)
+        if simple:
+            return repr(obj)
+    
+    # Larger lists with indentation
+    items = [argumentToString(x) for x in obj]
+    if all('\n' not in item for item in items):
+        joined = ", ".join(items)
+        if len(joined) < 60:
+            return "[" + joined + "]"
+    
+    formatted = ",\n  ".join(items)
+    return "[\n  " + formatted + "\n]"
 
-        # For larger or complex dicts, format with indentation
-        lines = []
-        # Sort keys for consistent output
-        for k in sorted(obj.keys(), key=str):
-            v = obj[k]
-            # Format the value
-            formatted_val = argumentToString(v, **kwargs)
 
-            # Handle multiline values
-            if '\n' in formatted_val:
-                # Indent multiline values
-                indented_val = formatted_val.replace('\n', '\n    ')
-                lines.append(f"  {k!r}: {indented_val}")
-            else:
-                lines.append(f"  {k!r}: {formatted_val}")
+@argumentToString.register(tuple)
+def _format_tuple(obj: tuple) -> str:
+    """Format tuple objects."""
+    if len(obj) > 50:
+        return f"<tuple with {len(obj)} items>"
+    
+    if not obj:
+        return "()"
+    
+    if len(obj) == 1:
+        return f"({argumentToString(obj[0])},)"
+    
+    # Small tuples with simple values on one line
+    if len(obj) <= 5:
+        simple = all(isinstance(x, (str, int, float, bool, type(None))) for x in obj)
+        if simple:
+            return repr(obj)
+    
+    items = [argumentToString(x) for x in obj]
+    if all('\n' not in item for item in items):
+        joined = ", ".join(items)
+        if len(joined) < 60:
+            return "(" + joined + ")"
+    
+    formatted = ",\n  ".join(items)
+    return "(\n  " + formatted + "\n)"
 
-        return "{\n" + "\n".join(lines) + "\n}"
-    except Exception:
-        # Fall back to json for any errors
-        try:
-            return json.dumps(obj, indent=2, sort_keys=True, default=str)
-        except:
-            return f"<dict with {len(obj)} items>"
 
 @argumentToString.register(set)
 @argumentToString.register(frozenset)
-def _format_set(obj, **kwargs):
-    """Format set and frozenset objects"""
+def _format_set(obj: Union[set, frozenset]) -> str:
+    """Format set and frozenset objects."""
     if len(obj) > 20:
-        return f"<{obj.__class__.__name__} with {len(obj)} items>"
+        return f"<{type(obj).__name__} with {len(obj)} items>"
+    
+    if not obj:
+        return "set()" if isinstance(obj, set) else "frozenset()"
+    
     try:
-        # Sort items for consistent output
         sorted_items = sorted(obj, key=str)
-        items = [argumentToString(x, **kwargs) for x in sorted_items]
-
-        # For small sets, keep them on one line
+        items = [argumentToString(x) for x in sorted_items]
+        
         if len(obj) <= 5:
-            return f"{{{', '.join(items)}}}"
-
-        # For larger sets, format with one item per line for better readability
-        formatted_items = ',\n  '.join(items)
-        return "{{\n  {}\n}}".format(formatted_items)
+            return "{" + ", ".join(items) + "}"
+        
+        return "{\n  " + ",\n  ".join(items) + "\n}"
     except Exception:
-        return f"<{obj.__class__.__name__} with {len(obj)} items>"
+        return f"<{type(obj).__name__} with {len(obj)} items>"
 
-# Additional formatters for better display
-@argumentToString.register(list)
-def _format_list(obj, **kwargs):
-    """Format list objects with better structure"""
-    if len(obj) > 50:
-        return f"<list with {len(obj)} items>"
 
-    try:
-        # For empty list
-        if not obj:
-            return "[]"
+# ============================================================================
+# IceCream Debugger Class
+# ============================================================================
 
-        # For small lists with simple values, keep on one line
-        if len(obj) <= 5 and all(isinstance(x, (str, int, float, bool)) for x in obj):
-            items = [repr(x) for x in obj]
-            return "[{}]".format(", ".join(items))
-
-        # For larger or complex lists, format with indentation
-        items = []
-        for x in obj:
-            # Format the value
-            formatted_val = argumentToString(x, **kwargs)
-
-            # Handle multiline values
-            if '\n' in formatted_val:
-                # Indent multiline values
-                indented_val = formatted_val.replace('\n', '\n  ')
-                items.append(f"  {indented_val}")
+class IceCreamDebugger:
+    """IceCream-compatible debugging class with Rich-style output.
+    
+    This class provides the core debugging functionality with support for:
+    - Variable inspection with expression display
+    - Configurable output (prefix, output function, formatting)
+    - Enable/disable toggle
+    - Context information (file, line, function)
+    
+    Example:
+        >>> ic = IceCreamDebugger()
+        >>> x = 42
+        >>> ic(x)
+        ic| x: 42
+        
+        >>> ic.configureOutput(prefix='DEBUG| ')
+        >>> ic(x)
+        DEBUG| x: 42
+    """
+    
+    _pair_delimiter = ', '
+    
+    def __init__(
+        self,
+        prefix: Union[str, Callable[[], str]] = DEFAULT_PREFIX,
+        outputFunction: Callable[[str], None] = _colorized_stderr_print,
+        argToStringFunction: Callable[[Any], str] = argumentToString,
+        includeContext: bool = False,
+        contextAbsPath: bool = False,
+    ):
+        """Initialize the IceCream debugger.
+        
+        Args:
+            prefix: Prefix string or callable returning prefix.
+            outputFunction: Function to output formatted text.
+            argToStringFunction: Function to convert args to strings.
+            includeContext: Whether to include file/line/function context.
+            contextAbsPath: Whether to use absolute paths in context.
+        """
+        self._enabled = True
+        self._prefix = prefix
+        self._outputFunction = outputFunction
+        self._argToStringFunction = argToStringFunction
+        self._includeContext = includeContext
+        self._contextAbsPath = contextAbsPath
+    
+    @property
+    def enabled(self) -> bool:
+        """Check if debugging output is enabled."""
+        return self._enabled
+    
+    def enable(self) -> None:
+        """Enable debugging output."""
+        self._enabled = True
+    
+    def disable(self) -> None:
+        """Disable debugging output."""
+        self._enabled = False
+    
+    def configureOutput(
+        self,
+        prefix: Union[str, Callable[[], str], None] = None,
+        outputFunction: Optional[Callable[[str], None]] = None,
+        argToStringFunction: Optional[Callable[[Any], str]] = None,
+        includeContext: Optional[bool] = None,
+        contextAbsPath: Optional[bool] = None,
+    ) -> None:
+        """Configure output settings.
+        
+        Args:
+            prefix: New prefix string or callable.
+            outputFunction: New output function.
+            argToStringFunction: New argument formatting function.
+            includeContext: Whether to include context.
+            contextAbsPath: Whether to use absolute paths.
+            
+        Raises:
+            TypeError: If no arguments are provided.
+        """
+        if all(arg is None for arg in [prefix, outputFunction, argToStringFunction, 
+                                        includeContext, contextAbsPath]):
+            raise TypeError("configureOutput() requires at least one argument")
+        
+        if prefix is not None:
+            self._prefix = prefix
+        if outputFunction is not None:
+            self._outputFunction = outputFunction
+        if argToStringFunction is not None:
+            self._argToStringFunction = argToStringFunction
+        if includeContext is not None:
+            self._includeContext = includeContext
+        if contextAbsPath is not None:
+            self._contextAbsPath = contextAbsPath
+    
+    def __call__(self, *args) -> Any:
+        """Debug print the arguments and return them.
+        
+        Args:
+            *args: Values to debug print.
+            
+        Returns:
+            None if no args, single arg if one arg, tuple if multiple.
+        """
+        if self._enabled:
+            call_frame = inspect.currentframe().f_back
+            output = self._format(call_frame, *args)
+            self._outputFunction(output)
+        
+        # Return passthrough
+        if not args:
+            return None
+        elif len(args) == 1:
+            return args[0]
+        else:
+            return args
+    
+    def format(self, *args) -> str:
+        """Format arguments without printing.
+        
+        Args:
+            *args: Values to format.
+            
+        Returns:
+            Formatted string.
+        """
+        call_frame = inspect.currentframe().f_back
+        return self._format(call_frame, *args)
+    
+    def _format(self, call_frame, *args) -> str:
+        """Internal formatting method.
+        
+        Args:
+            call_frame: The calling frame.
+            *args: Values to format.
+            
+        Returns:
+            Formatted string.
+        """
+        prefix = self._get_prefix()
+        context = self._format_context(call_frame) if self._includeContext else ''
+        
+        if not args:
+            # No args - just show context or time
+            time_str = self._format_time()
+            if context:
+                return f"{prefix}{context}{time_str}"
+            return f"{prefix}{time_str}"
+        
+        # Format the arguments
+        return self._format_args(call_frame, prefix, context, args)
+    
+    def _get_prefix(self) -> str:
+        """Get the current prefix string."""
+        if callable(self._prefix):
+            return self._prefix()
+        return self._prefix
+    
+    def _format_context(self, call_frame) -> str:
+        """Format the call context (file:line in function)."""
+        frame_info = inspect.getframeinfo(call_frame)
+        
+        if self._contextAbsPath:
+            filename = realpath(frame_info.filename)
+        else:
+            filename = basename(frame_info.filename)
+        
+        lineno = frame_info.lineno
+        func_name = frame_info.function
+        
+        if func_name != '<module>':
+            func_name = f'{func_name}()'
+        
+        return f"{filename}:{lineno} in {func_name}"
+    
+    def _format_time(self) -> str:
+        """Format current time."""
+        now = datetime.now()
+        return now.strftime('%H:%M:%S.%f')[:-3]
+    
+    def _format_args(self, call_frame, prefix: str, context: str, args: tuple) -> str:
+        """Format the argument values with their expressions.
+        
+        Args:
+            call_frame: The calling frame.
+            prefix: Output prefix.
+            context: Context string.
+            args: Argument values.
+            
+        Returns:
+            Formatted string.
+        """
+        # Get the source expressions for arguments
+        call_node = Source.executing(call_frame).node
+        
+        if call_node is not None:
+            source = Source.for_frame(call_frame)
+            arg_strs = [
+                source.get_text_with_indentation(arg)
+                for arg in call_node.args
+            ]
+        else:
+            warnings.warn(NO_SOURCE_WARNING, RuntimeWarning, stacklevel=4)
+            arg_strs = [_ABSENT] * len(args)
+        
+        # Build pairs of (expression, value)
+        pairs = list(zip(arg_strs, args))
+        
+        # Format each pair
+        formatted_pairs = []
+        for expr, val in pairs:
+            val_str = self._argToStringFunction(val)
+            
+            if expr is _ABSENT or _is_literal(expr):
+                # Just the value
+                formatted_pairs.append(val_str)
             else:
-                items.append(f"  {formatted_val}")
+                # Expression: value
+                formatted_pairs.append(f"{expr}: {val_str}")
+        
+        # Join pairs
+        args_str = self._pair_delimiter.join(formatted_pairs)
+        
+        # Build the output
+        if context:
+            return f"{prefix}[{context}] >>> {args_str}"
+        else:
+            return f"{prefix}{args_str}"
+    
+    def __repr__(self) -> str:
+        return f"<IceCreamDebugger prefix={self._prefix!r} enabled={self._enabled}>"
 
-        return "[\n" + "\n".join(items) + "\n]"
-    except Exception:
-        return f"<list with {len(obj)} items>"
 
-@argumentToString.register(tuple)
-def _format_tuple(obj, **kwargs):
-    """Format tuple objects with better structure"""
-    if len(obj) > 50:
-        return f"<tuple with {len(obj)} items>"
+# ============================================================================
+# Legacy Compatibility - LITPrintDebugger alias
+# ============================================================================
 
+# Alias for backward compatibility
+LITPrintDebugger = IceCreamDebugger
+
+
+# ============================================================================
+# Module-level Utilities
+# ============================================================================
+
+def clearStyleCache() -> None:
+    """Clear the style formatter cache (placeholder for compatibility)."""
+    pass
+
+
+def getStyleCacheInfo() -> Dict[str, Any]:
+    """Get style cache information."""
+    return {"cache_size": 0, "cached_styles": []}
+
+
+def isTerminalCapable() -> bool:
+    """Check if the terminal supports colors."""
+    import os
+    
+    # Respect NO_COLOR environment variable
+    if os.environ.get('NO_COLOR'):
+        return False
+    
+    # Check if stdout is a TTY
     try:
-        # For empty tuple
-        if not obj:
-            return "()"
-
-        # For single item tuple, ensure trailing comma
-        if len(obj) == 1:
-            return f"({argumentToString(obj[0], **kwargs)},)"
-
-        # For small tuples with simple values, keep on one line
-        if len(obj) <= 5 and all(isinstance(x, (str, int, float, bool)) for x in obj):
-            items = [repr(x) for x in obj]
-            return "({})".format(", ".join(items))
-
-        # For larger or complex tuples, format with indentation
-        items = []
-        for x in obj:
-            # Format the value
-            formatted_val = argumentToString(x, **kwargs)
-
-            # Handle multiline values
-            if '\n' in formatted_val:
-                # Indent multiline values
-                indented_val = formatted_val.replace('\n', '\n  ')
-                items.append(f"  {indented_val}")
-            else:
-                items.append(f"  {formatted_val}")
-
-        return "(\n" + "\n".join(items) + "\n)"
+        return sys.stderr.isatty()
     except Exception:
-        return f"<tuple with {len(obj)} items>"
+        return False
