@@ -6,11 +6,12 @@ Provides functions to install litprinter functions into Python builtins,
 making them available globally without imports.
 
 Usage:
-    from litprinter.builtins import install, uninstall
+    from litprinter import install, uninstall
     
-    install()  # Now ic() and litprint() work globally
+    install()  # Now ic() works globally without import!
     
-    ic(x)  # Works without import!
+    # In any file, without import:
+    ic(x)
     
     uninstall()  # Remove from builtins
 
@@ -18,86 +19,43 @@ Author: OEvortex <helpingai5@gmail.com>
 License: MIT
 """
 
-try:
-    import builtins as _builtins
-except ImportError:
-    import __builtin__ as _builtins  # Python 2 compatibility
+from typing import Optional
 
-from .litprint import ic, LIT, litprint, configureOutput, enable, disable
+_builtins = __import__('builtins')
 
 
-def install(
-    ic_name: str = 'ic',
-    lit_name: str = 'LIT',
-    litprint_name: str = 'litprint',
-    install_helpers: bool = True,
-) -> None:
-    """Install litprinter functions into Python builtins.
+def install(ic: str = 'ic') -> None:
+    """Install ic to Python builtins for global access.
     
-    After calling this function, ic(), LIT(), and litprint() will be
-    available globally without needing to import them.
+    After calling this function, ic() will be available globally
+    without needing to import it.
     
     Args:
-        ic_name: Name for the ic function in builtins (default: 'ic').
-                 Set to None or '' to skip.
-        lit_name: Name for the LIT function in builtins (default: 'LIT').
-                  Set to None or '' to skip.
-        litprint_name: Name for litprint function (default: 'litprint').
-                       Set to None or '' to skip.
-        install_helpers: Whether to also install enable/disable/configureOutput.
+        ic: Name for the ic function in builtins (default: 'ic').
     
     Example:
-        >>> from litprinter.builtins import install
+        >>> from litprinter import install
         >>> install()
-        >>> ic(42)  # Works globally now!
-        ic| 42
+        >>> # Now in any file, without import:
+        >>> ic(x)  # Works!
     """
-    # Install main functions
-    if ic_name:
-        setattr(_builtins, ic_name, ic)
-    
-    if lit_name:
-        setattr(_builtins, lit_name, LIT)
-    
-    if litprint_name:
-        setattr(_builtins, litprint_name, litprint)
-    
-    # Install helper functions
-    if install_helpers:
-        setattr(_builtins, 'ic_configure', configureOutput)
-        setattr(_builtins, 'ic_enable', enable)
-        setattr(_builtins, 'ic_disable', disable)
+    import litprinter
+    setattr(_builtins, ic, litprinter.ic)
 
 
-def uninstall(
-    ic_name: str = 'ic',
-    lit_name: str = 'LIT', 
-    litprint_name: str = 'litprint',
-    uninstall_helpers: bool = True,
-) -> None:
-    """Remove litprinter functions from Python builtins.
+def uninstall(ic: str = 'ic') -> None:
+    """Remove ic from Python builtins.
     
     Args:
-        ic_name: Name of ic function to remove.
-        lit_name: Name of LIT function to remove.
-        litprint_name: Name of litprint function to remove.
-        uninstall_helpers: Whether to also remove helper functions.
+        ic: Name of the function to remove (default: 'ic').
     
     Example:
-        >>> from litprinter.builtins import uninstall
+        >>> from litprinter import uninstall
         >>> uninstall()
-        >>> ic(42)  # NameError: name 'ic' is not defined
+        >>> ic(x)  # NameError: name 'ic' is not defined
     """
-    # Remove main functions
-    for name in [ic_name, lit_name, litprint_name]:
-        if name and hasattr(_builtins, name):
-            delattr(_builtins, name)
-    
-    # Remove helper functions
-    if uninstall_helpers:
-        for name in ['ic_configure', 'ic_enable', 'ic_disable']:
-            if hasattr(_builtins, name):
-                delattr(_builtins, name)
+    if hasattr(_builtins, ic):
+        delattr(_builtins, ic)
 
 
 # ============================================================================

@@ -38,13 +38,12 @@ pip install litprinter
 ```
 
 ```python
-from litprinter import ic
-
+# No import needed! ic is automatically available
 x = 42
 ic(x)  # Output: ic| x: 42
 ```
 
-That's it! LitPrinter automatically shows both the variable name and its value with beautiful syntax highlighting.
+That's it! After installing, `ic()` is automatically available in all your Python scripts - no import required!
 
 ## 🎯 IceCream-Compatible API
 
@@ -194,17 +193,24 @@ def format_myclass(obj):
 ic(MyClass("test"))  # ic| MyClass(test)
 ```
 
-## 🌐 Global Installation
+## 🌐 Always Available
 
-Make `ic()` available everywhere without imports:
+After `pip install litprinter`, `ic()` is **automatically available** in all Python scripts - no import needed!
 
 ```python
-from litprinter.builtins import install
+# my_script.py - no import required!
+x = 42
+ic(x)  # Just works!
+```
 
+If you want to temporarily disable:
+```python
+from litprinter import uninstall
+uninstall()  # Remove ic from builtins
+
+# To re-enable:
+from litprinter import install
 install()
-
-# Now works anywhere!
-ic(x)
 ```
 
 ## 📦 Migration from IceCream

@@ -64,22 +64,14 @@ from .core import LITPrintDebugger
 # Builtins Installation
 # ============================================================================
 
-from .builtins import install as install_builtins, uninstall as uninstall_builtins
+from .builtins import install, uninstall
 
-# Auto-install ic to builtins so it's available globally without imports
-# This makes `ic(x)` work anywhere after `pip install litprinter`
-try:
-    import builtins as _builtins
-except ImportError:
-    import __builtin__ as _builtins
-
-# Install ic, LIT, and litprint to builtins automatically
-if not hasattr(_builtins, 'ic'):
-    _builtins.ic = ic
-if not hasattr(_builtins, 'LIT'):
-    _builtins.LIT = LIT
-if not hasattr(_builtins, 'litprint'):
-    _builtins.litprint = litprint
+# Auto-install ic to builtins when litprinter is imported
+# This makes ic() available globally after `pip install litprinter`
+_builtins = __import__('builtins')
+_builtins.ic = ic
+_builtins.LIT = LIT
+_builtins.litprint = litprint
 
 # ============================================================================
 # Colors and Styling
@@ -175,7 +167,7 @@ except ImportError:
 # Version
 # ============================================================================
 
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 
 # ============================================================================
 # Public API
@@ -196,9 +188,9 @@ __all__ = [
     "argumentToString",
     "IceCreamDebugger",
     "LITPrintDebugger",
-    # Builtins
-    "install_builtins",
-    "uninstall_builtins",
+    # Builtins (like IceCream)
+    "install",
+    "uninstall",
     # Color Styles
     "SolarizedDark",
     "LitStyle",

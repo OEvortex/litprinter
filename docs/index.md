@@ -13,13 +13,12 @@ pip install litprinter
 ## Quick Start
 
 ```python
-from litprinter import ic
-
+# No import needed after pip install!
 x = 42
 ic(x)  # Output: ic| x: 42
 ```
 
-That's it! LitPrinter automatically shows both the variable name and its value.
+That's it! After installing, `ic()` is automatically available in all your Python scripts - no import required!
 
 ## Why LitPrinter?
 
@@ -172,10 +171,10 @@ install(
 
 ## Builtins Installation
 
-Make `ic()` available globally without imports:
+Make `ic()` available globally without imports (just like IceCream):
 
 ```python
-from litprinter.builtins import install
+from litprinter import install
 
 install()
 

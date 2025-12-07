@@ -10,11 +10,10 @@ readme = "README.md"
 authors = [
     {name = "OEvortex", email = "helpingai5@gmail.com"}
 ]
-license = {text = "MIT"}
+license = "MIT"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -54,6 +53,10 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.data-files]
+# Install .pth file to site-packages so ic is always available
+"" = ["src/litprinter_autoload.pth"]
 
 [tool.setuptools.dynamic]
 version = {attr = "litprinter.__version__"}
