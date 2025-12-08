@@ -566,8 +566,23 @@ class IceCreamDebugger:
         for expr, val in pairs:
             val_str = self._argToStringFunction(val)
             
-            if expr is _ABSENT or _is_literal(expr):
-                # Just the value
+            # Check if expression is absent, a literal, or an f-string
+            # F-strings are evaluated immediately, so showing both source and value is redundant
+            is_fstring = expr is not _ABSENT and isinstance(expr, str) and (
+                expr.startswith('f"') or expr.startswith("f'") or
+                expr.startswith('F"') or expr.startswith("F'") or
+                expr.startswith('fr"') or expr.startswith("fr'") or
+                expr.startswith('rf"') or expr.startswith("rf'") or
+                expr.startswith('Fr"') or expr.startswith("Fr'") or
+                expr.startswith('fR"') or expr.startswith("fR'") or
+                expr.startswith('FR"') or expr.startswith("FR'") or
+                expr.startswith('rF"') or expr.startswith("rF'") or
+                expr.startswith('Rf"') or expr.startswith("Rf'") or
+                expr.startswith('RF"') or expr.startswith("RF'")
+            )
+            
+            if expr is _ABSENT or _is_literal(expr) or is_fstring:
+                # Just the value (skip redundant f-string source)
                 formatted_pairs.append(val_str)
             else:
                 # Expression: value

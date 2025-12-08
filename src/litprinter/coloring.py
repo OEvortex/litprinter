@@ -18,12 +18,123 @@ from pygments.token import (
 
 
 __all__ = [
+    "TokyoNight",         # Beautiful Tokyo Night theme (NEW DEFAULT)
+    "LitStyle",           # Catppuccin-inspired style
     "SolarizedDark",      # IceCream-compatible
-    "LitStyle",           # Default LitPrinter style
     "CyberpunkStyle",     # Neon cyberpunk theme  
     "MonokaiStyle",       # Classic Monokai
     "DEFAULT_STYLE",      # Default style to use
 ]
+
+
+# =============================================================================
+# Tokyo Night - Stunning Dark Theme (NEW DEFAULT)
+# Inspired by the popular Tokyo Night VSCode theme
+# =============================================================================
+
+class TokyoNight(Style):
+    """Tokyo Night theme - Beautiful blue-purple dark theme with vibrant colors."""
+    
+    # Background & Foreground
+    BG         = '#1a1b26'   # Deep blue-black background
+    FG         = '#c0caf5'   # Soft lavender foreground
+    FG_DARK    = '#a9b1d6'   # Muted foreground
+    
+    # Core colors
+    COMMENT    = '#565f89'   # Muted blue-gray
+    RED        = '#f7768e'   # Soft coral red
+    ORANGE     = '#ff9e64'   # Warm orange
+    YELLOW     = '#e0af68'   # Golden yellow
+    GREEN      = '#9ece6a'   # Fresh green
+    TEAL       = '#73daca'   # Aqua teal
+    CYAN       = '#7dcfff'   # Sky blue cyan
+    BLUE       = '#7aa2f7'   # Bright blue
+    PURPLE     = '#bb9af7'   # Soft purple
+    MAGENTA    = '#ff007c'   # Hot magenta
+    PINK       = '#f7768e'   # Soft pink
+    
+    background_color = BG
+    
+    styles = {
+        Text:                   FG,
+        Whitespace:             BG,
+        Error:                  RED,
+        Other:                  FG,
+
+        Name:                   FG,
+        Name.Attribute:         TEAL,
+        Name.Builtin:           CYAN,
+        Name.Builtin.Pseudo:    CYAN,
+        Name.Class:             TEAL,
+        Name.Constant:          ORANGE,
+        Name.Decorator:         YELLOW,
+        Name.Entity:            ORANGE,
+        Name.Exception:         RED,
+        Name.Function:          BLUE,
+        Name.Property:          TEAL,
+        Name.Label:             FG,
+        Name.Namespace:         PURPLE,
+        Name.Other:             FG,
+        Name.Tag:               RED,
+        Name.Variable:          FG,
+        Name.Variable.Class:    TEAL,
+        Name.Variable.Global:   TEAL,
+        Name.Variable.Instance: TEAL,
+
+        String:                 GREEN,
+        String.Backtick:        GREEN,
+        String.Char:            GREEN,
+        String.Doc:             COMMENT,
+        String.Double:          GREEN,
+        String.Escape:          ORANGE,
+        String.Heredoc:         GREEN,
+        String.Interpol:        CYAN,
+        String.Other:           GREEN,
+        String.Regex:           TEAL,
+        String.Single:          GREEN,
+        String.Symbol:          GREEN,
+
+        Number:                 ORANGE,
+        Number.Float:           ORANGE,
+        Number.Hex:             ORANGE,
+        Number.Integer:         ORANGE,
+        Number.Integer.Long:    ORANGE,
+        Number.Oct:             ORANGE,
+
+        Keyword:                PURPLE,
+        Keyword.Constant:       ORANGE,
+        Keyword.Declaration:    PURPLE,
+        Keyword.Namespace:      PURPLE,
+        Keyword.Pseudo:         PURPLE,
+        Keyword.Reserved:       PURPLE,
+        Keyword.Type:           CYAN,
+
+        Generic:                FG,
+        Generic.Deleted:        RED,
+        Generic.Emph:           'italic ' + FG,
+        Generic.Error:          RED,
+        Generic.Heading:        'bold ' + BLUE,
+        Generic.Inserted:       GREEN,
+        Generic.Output:         COMMENT,
+        Generic.Prompt:         CYAN,
+        Generic.Strong:         'bold ' + FG,
+        Generic.Subheading:     'bold ' + PURPLE,
+        Generic.Traceback:      RED,
+
+        Literal:                FG,
+        Literal.Date:           TEAL,
+
+        Comment:                COMMENT,
+        Comment.Multiline:      COMMENT,
+        Comment.Preproc:        CYAN,
+        Comment.Single:         COMMENT,
+        Comment.Special:        'bold ' + YELLOW,
+
+        Operator:               CYAN,
+        Operator.Word:          PURPLE,
+
+        Punctuation:            FG_DARK,
+    }
 
 
 # =============================================================================
@@ -438,7 +549,5 @@ class MonokaiStyle(Style):
 
         Punctuation:            FG,
     }
-
-
-# Default style - use SolarizedDark for IceCream compatibility
-DEFAULT_STYLE = SolarizedDark
+# Default style - Tokyo Night for stunning blue-purple aesthetics
+DEFAULT_STYLE = TokyoNight

@@ -78,8 +78,9 @@ _builtins.litprint = litprint
 # ============================================================================
 
 from .coloring import (
+    TokyoNight,       # Tokyo Night theme (NEW DEFAULT)
+    LitStyle,         # Catppuccin-inspired (brighter)
     SolarizedDark,    # IceCream-compatible
-    LitStyle,         # LitPrinter default (brighter)
     CyberpunkStyle,   # Neon cyberpunk
     MonokaiStyle,     # Classic Monokai
     DEFAULT_STYLE,    # Current default
@@ -192,6 +193,7 @@ __all__ = [
     "install",
     "uninstall",
     # Color Styles
+    "TokyoNight",
     "SolarizedDark",
     "LitStyle",
     "CyberpunkStyle",
