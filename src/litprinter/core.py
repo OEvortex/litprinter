@@ -32,6 +32,7 @@ from os.path import basename, realpath
 from textwrap import dedent
 import ast
 import inspect
+import importlib
 import pprint
 import sys
 import warnings
@@ -41,14 +42,14 @@ from typing import Any, List, Type, Optional, Dict, Callable, Union
 
 # Optional imports
 try:
-    import colorama
+    colorama = importlib.import_module("colorama")
     HAS_COLORAMA = True
 except ImportError:
     colorama = None
     HAS_COLORAMA = False
 
 try:
-    import executing
+    executing = importlib.import_module("executing")
 except ImportError as exc:
     raise ImportError(
         "The 'executing' package is required for litprinter. "
@@ -56,20 +57,21 @@ except ImportError as exc:
     ) from exc
 
 try:
-    from pygments import highlight
-    from pygments.formatters import Terminal256Formatter
-    from pygments.lexers import Python3Lexer
+    _pygments = importlib.import_module("pygments")
+    _pygments_formatters = importlib.import_module("pygments.formatters.terminal256")
+    _pygments_lexers = importlib.import_module("pygments.lexers.python")
+
+    highlight = getattr(_pygments, "highlight")
+    _Terminal256Formatter = getattr(_pygments_formatters, "Terminal256Formatter")
+    _Python3Lexer = getattr(_pygments_lexers, "Python3Lexer")
     HAS_PYGMENTS = True
 except ImportError:
     HAS_PYGMENTS = False
     highlight = None
-    Terminal256Formatter = None
-    Python3Lexer = None
+    _Terminal256Formatter = None
+    _Python3Lexer = None
 
-try:
-    from .coloring import CyberpunkStyle
-except ImportError:
-    CyberpunkStyle = None
+from .coloring import CyberpunkStyle
 
 # Sentinel for absent values
 _ABSENT = object()
@@ -119,7 +121,7 @@ def get_style():
 @contextmanager
 def _windows_color_support():
     """Enable color support on Windows terminals."""
-    if HAS_COLORAMA:
+    if HAS_COLORAMA and colorama is not None:
         colorama.init()
         try:
             yield
@@ -131,23 +133,28 @@ def _windows_color_support():
 
 def _create_formatter():
     """Create a Pygments formatter with the current style."""
-    if not HAS_PYGMENTS:
+    if not HAS_PYGMENTS or _Terminal256Formatter is None:
         return None
     
     style = get_style()
     if style:
-        return Terminal256Formatter(style=style)
-    return Terminal256Formatter()
+        return _Terminal256Formatter(style=style)
+    return _Terminal256Formatter()
 
 
 def _colorize(text: str) -> str:
     """Apply syntax highlighting to text."""
-    if not HAS_PYGMENTS:
+    if (
+        not HAS_PYGMENTS
+        or highlight is None
+        or _Python3Lexer is None
+        or _Terminal256Formatter is None
+    ):
         return text
     
     try:
         formatter = _create_formatter()
-        lexer = Python3Lexer(ensurenl=False)
+        lexer = _Python3Lexer(ensurenl=False)
         return highlight(text, lexer, formatter).rstrip()
     except Exception:
         return text
@@ -458,7 +465,8 @@ class IceCreamDebugger:
             None if no args, single arg if one arg, tuple if multiple.
         """
         if self._enabled:
-            call_frame = inspect.currentframe().f_back
+            current_frame = inspect.currentframe()
+            call_frame = current_frame.f_back if current_frame else None
             output = self._format(call_frame, *args)
             self._outputFunction(output)
         
@@ -479,7 +487,8 @@ class IceCreamDebugger:
         Returns:
             Formatted string.
         """
-        call_frame = inspect.currentframe().f_back
+        current_frame = inspect.currentframe()
+        call_frame = current_frame.f_back if current_frame else None
         return self._format(call_frame, *args)
     
     def _format(self, call_frame, *args) -> str:
@@ -513,6 +522,9 @@ class IceCreamDebugger:
     
     def _format_context(self, call_frame) -> str:
         """Format the call context (file:line in function)."""
+        if call_frame is None:
+            return "<unknown>:0 in <unknown>"
+
         frame_info = inspect.getframeinfo(call_frame)
         
         if self._contextAbsPath:
@@ -546,17 +558,20 @@ class IceCreamDebugger:
             Formatted string.
         """
         # Get the source expressions for arguments
-        call_node = Source.executing(call_frame).node
-        
-        if call_node is not None:
-            source = Source.for_frame(call_frame)
-            arg_strs = [
-                source.get_text_with_indentation(arg)
-                for arg in call_node.args
-            ]
-        else:
-            warnings.warn(NO_SOURCE_WARNING, RuntimeWarning, stacklevel=4)
+        if call_frame is None:
             arg_strs = [_ABSENT] * len(args)
+        else:
+            call_node = Source.executing(call_frame).node
+        
+            if call_node is not None:
+                source = Source.for_frame(call_frame)
+                arg_strs = [
+                    source.get_text_with_indentation(arg)
+                    for arg in call_node.args
+                ]
+            else:
+                warnings.warn(NO_SOURCE_WARNING, RuntimeWarning, stacklevel=4)
+                arg_strs = [_ABSENT] * len(args)
         
         # Build pairs of (expression, value)
         pairs = list(zip(arg_strs, args))

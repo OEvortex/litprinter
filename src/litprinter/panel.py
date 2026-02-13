@@ -36,10 +36,7 @@ except ImportError:
         from litprinter.style import Style
         from litprinter.text import Text
     except ImportError:
-        Box = None
-        RichSegment = None
-        Style = None
-        Text = None
+        raise
 
 
 class BorderStyle(Enum):

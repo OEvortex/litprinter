@@ -11,10 +11,11 @@ License: MIT
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple, Iterator, Union, Callable, Pattern, TYPE_CHECKING
+from typing import List, Optional, Tuple, Iterator, Union, Callable, Pattern, TYPE_CHECKING, cast
 import textwrap
 
 if TYPE_CHECKING:
+    from .segment import Segment
     from .style import Style
 
 
@@ -811,8 +812,13 @@ class Text:
         for part in parts:
             if isinstance(part, str):
                 result.append(part)
-            elif isinstance(part, tuple):
-                text, style = part
+            elif (
+                isinstance(part, tuple)
+                and len(part) == 2
+                and isinstance(part[0], str)
+                and isinstance(part[1], str)
+            ):
+                text, style = cast(Tuple[str, str], part)
                 result.append(text, style)
             elif isinstance(part, Text):
                 result.append_text(part)

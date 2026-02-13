@@ -209,7 +209,7 @@ class Console:
     def encoding(self) -> str:
         """Get the output encoding."""
         try:
-            return self.file.encoding or "utf-8"
+            return getattr(self.file, "encoding", None) or "utf-8"
         except Exception:
             return "utf-8"
     

@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "The most sophisticated debug printing library for Python - IceCream + Rich fusion with syntax highlighting and beautiful tracebacks"
 readme = "README.md"
 authors = [
-    {name = "OEvortex", email = "helpingai5@gmail.com"}
+    {name = "OEvortex", email = "koulabhay25@gmail.com"}
 ]
 license = "MIT"
 classifiers = [
@@ -75,3 +75,6 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
+
+[tool.ty.rules]
+unresolved-import = "ignore"

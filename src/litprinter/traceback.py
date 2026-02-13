@@ -25,7 +25,7 @@ Available themes (when Pygments is installed):
       nord, github, vscode, material, retro, ocean, autumn, synthwave, forest, monochrome,
       sunset, etc.
 
-Author: OEvortex <helpingai5@gmail.com>
+Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
 """
 
@@ -36,6 +36,7 @@ import os
 import pprint
 import shutil
 import datetime
+import importlib
 from dataclasses import dataclass, field
 from types import TracebackType, FrameType, ModuleType, FunctionType, BuiltinFunctionType, MethodType
 from typing import (
@@ -46,13 +47,11 @@ from typing import (
     List,
     Optional,
     Type,
-    TypeAlias,
 )
 
-try:
-    from types import ClassType
-except ImportError:
-    ClassType: TypeAlias = type
+PygmentsStyle: Any
+
+ClassType = type
 
 # Type alias for suppression paths
 SuppressType = Iterable[str]
@@ -64,9 +63,13 @@ try:
     # pylint: disable=unused-import
     import pygments  # Base package import to check availability
     from pygments import highlight  # Core highlighting function
-    from pygments.lexers import guess_lexer_for_filename, PythonLexer, TextLexer  # Lexers for code parsing
-    from pygments.formatters import Terminal256Formatter  # Terminal formatter for colored output
-    from pygments.style import Style as PygmentsStyle  # Base style class
+    from pygments.lexers import guess_lexer_for_filename  # Lexers for code parsing
+    from pygments.lexers.python import PythonLexer
+    from pygments.lexers.special import TextLexer
+    _pygments_terminal256 = importlib.import_module("pygments.formatters.terminal256")
+    _Terminal256Formatter = getattr(_pygments_terminal256, "Terminal256Formatter")
+    from pygments.style import Style as _PygmentsStyle  # Base style class
+    PygmentsStyle = _PygmentsStyle
     from pygments.styles import get_style_by_name  # Function to get built-in styles
     # Import all token types for potential use in custom styles
     # These are used by the custom styles in the styles package
@@ -112,13 +115,14 @@ try:
     except ImportError:
         # If styles package is not available, create an empty dictionary
         CUSTOM_STYLES = {}
-        create_custom_style = None
+        def create_custom_style(name, colors):
+            """Fallback custom style creator when styles package isn't available."""
+            return None
 
 except ImportError:
     # Pygments itself is not installed - create fallback stubs
     HAS_PYGMENTS = False
     PygmentsStyle = type  # Use regular type as a base class substitute
-    Terminal256Formatter = None  # type: ignore
 
     # Create minimal stub implementations for Pygments functionality
     # pylint: disable=unused-argument,missing-docstring
@@ -138,6 +142,8 @@ except ImportError:
         """Stub for Terminal256Formatter."""
         def __init__(self, **kwargs):
             pass
+
+    _Terminal256Formatter = Terminal256FormatterFallback
 
     def get_style_by_name(name):
         """Stub for get_style_by_name."""
@@ -448,7 +454,7 @@ class PrettyTraceback:
         suppress: SuppressType = (),
         max_frames: int = 100,
         word_wrap: bool = False,
-        _selected_pygments_style_cls: Optional[Type[PygmentsStyle]] = None, # type: ignore
+        _selected_pygments_style_cls: Optional[Type[PygmentsStyle]] = None,
     ):
         self.exc_type = exc_type
         self.exc_value = exc_value
@@ -482,8 +488,8 @@ class PrettyTraceback:
                         self.style_cls = CUSTOM_STYLES.get(DEFAULT_THEME.lower()) or get_style_by_name('default')
 
             # Pass the CLASS to the formatter
-            if self.style_cls and Terminal256Formatter:
-                try: self.formatter = Terminal256Formatter(style=self.style_cls)
+            if self.style_cls and _Terminal256Formatter:
+                try: self.formatter = _Terminal256Formatter(style=self.style_cls)
                 except Exception:
                      self.formatter = None
                      # Log error silently - we'll fall back to non-highlighted output
@@ -1184,8 +1190,8 @@ def install(
                         if 'create_custom_style' in globals() and create_custom_style is not None:
                             try:
                                 # Create a simple default style with basic colors
-                                from pygments.token import Text
-                                selected_style_cls = create_custom_style('DefaultStyle', {Text: '#ffffff'})
+                                text_token = globals().get("Text", object)
+                                selected_style_cls = create_custom_style('DefaultStyle', {text_token: '#ffffff'})
                             except Exception:
                                 selected_style_cls = None
                         else:

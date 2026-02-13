@@ -69,9 +69,9 @@ from .builtins import install, uninstall
 # Auto-install ic to builtins when litprinter is imported
 # This makes ic() available globally after `pip install litprinter`
 _builtins = __import__('builtins')
-_builtins.ic = ic
-_builtins.LIT = LIT
-_builtins.litprint = litprint
+setattr(_builtins, "ic", ic)
+setattr(_builtins, "LIT", LIT)
+setattr(_builtins, "litprint", litprint)
 
 # ============================================================================
 # Colors and Styling
@@ -91,51 +91,29 @@ from .colors import Colors
 # Rich-style Infrastructure Modules
 # ============================================================================
 
-try:
-    from .segment import Segment, ControlType, ControlCode, render_segments
-except ImportError:
-    Segment = None
-    ControlType = None
-    ControlCode = None
-    render_segments = None
+from .segment import Segment, ControlType, ControlCode, render_segments
 
-try:
-    from .style import Style, NULL_STYLE, style, BOLD, DIM, ITALIC, UNDERLINE
-except ImportError:
-    Style = None
-    NULL_STYLE = None
+from .style import Style, NULL_STYLE, style, BOLD, DIM, ITALIC, UNDERLINE
 
-try:
-    from .text import Text, Span
-except ImportError:
-    Text = None
-    Span = None
+from .text import Text, Span
 
-try:
-    from .box import (
-        Box, ROUNDED, HEAVY, DOUBLE, SQUARE, ASCII, DASHED, DOTTED,
-        NONE as BOX_NONE, get_box, render_box
-    )
-except ImportError:
-    Box = None
-    ROUNDED = None
+from .box import (
+    Box, ROUNDED, HEAVY, DOUBLE, SQUARE, ASCII, DASHED, DOTTED,
+    NONE as BOX_NONE, get_box, render_box
+)
 
 # ============================================================================
 # Console with Rich-like Features
 # ============================================================================
 
 from .console import Console, console, cprint
-from .console import print as console_print
+from .console import print
 
 # ============================================================================
 # Panel Rendering
 # ============================================================================
 
-try:
-    from .panel import Panel, BorderStyle, Padding, Shadow, Background, PanelGroup, panel
-except ImportError:
-    Panel = None
-    BorderStyle = None
+from .panel import Panel, BorderStyle, Padding, Shadow, Background, PanelGroup, panel
 
 # ============================================================================
 # Traceback Formatting

@@ -80,7 +80,8 @@ class _IceCreamWrapper:
                     return args
             
             # Get the caller's frame
-            call_frame = inspect.currentframe().f_back
+            current_frame = inspect.currentframe()
+            call_frame = current_frame.f_back if current_frame else None
             
             # Format and output
             output = self._debugger._format(call_frame, *args)
@@ -108,7 +109,8 @@ class _IceCreamWrapper:
         Returns:
             Formatted string.
         """
-        call_frame = inspect.currentframe().f_back
+        current_frame = inspect.currentframe()
+        call_frame = current_frame.f_back if current_frame else None
         return self._debugger._format(call_frame, *args)
     
     def configureOutput(
@@ -210,7 +212,8 @@ def format(*args) -> str:
     Returns:
         Formatted string.
     """
-    call_frame = inspect.currentframe().f_back
+    current_frame = inspect.currentframe()
+    call_frame = current_frame.f_back if current_frame else None
     return ic._debugger._format(call_frame, *args)
 
 
