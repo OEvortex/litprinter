@@ -5,7 +5,7 @@ LitPrinter Box Module
 Provides Box classes for defining panel borders and box-drawing characters.
 Inspired by Rich's Box class with support for various border styles.
 
-Author: OEvortex <helpingai5@gmail.com>
+Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
 """
 

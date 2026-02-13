@@ -5,7 +5,7 @@ LitPrinter Coloring Module
 Defines color styles for syntax highlighting in ic/lit output.
 Includes IceCream-compatible SolarizedDark and custom LitPrinter styles.
 
-Author: OEvortex <helpingai5@gmail.com>
+Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
 """
 

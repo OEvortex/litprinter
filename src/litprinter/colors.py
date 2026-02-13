@@ -14,7 +14,7 @@ Features:
 - Text styling (bold, italic, etc.)
 - Color utilities and helpers
 
-Author: OEvortex <helpingai5@gmail.com>
+Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
 """
 

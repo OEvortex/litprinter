@@ -21,7 +21,7 @@ Usage:
     # Format without printing
     s = ic.format(x)
 
-Author: OEvortex <helpingai5@gmail.com>
+Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
 """
 

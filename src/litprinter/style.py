@@ -4,7 +4,7 @@ LitPrinter Style Module
 Provides a Style class for representing and composing terminal styles.
 Inspired by Rich's Style class with support for parsing, combining, and rendering styles.
 
-Author: OEvortex <helpingai5@gmail.com>
+Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
 """
 

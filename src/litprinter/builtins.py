@@ -15,7 +15,7 @@ Usage:
     
     uninstall()  # Remove from builtins
 
-Author: OEvortex <helpingai5@gmail.com>
+Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
 """
 

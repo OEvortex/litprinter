@@ -5,7 +5,7 @@ LitPrinter Segment Module
 Provides a Segment class for representing styled text segments, inspired by Rich.
 Segments are the fundamental building blocks for rendering styled terminal output.
 
-Author: OEvortex <helpingai5@gmail.com>
+Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
 """
 

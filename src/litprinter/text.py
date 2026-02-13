@@ -5,7 +5,7 @@ LitPrinter Text Module
 Provides a Text class for handling styled text with spans.
 Inspired by Rich's Text class with support for markup, styling ranges, and rendering.
 
-Author: OEvortex <helpingai5@gmail.com>
+Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
 """
 

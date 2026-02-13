@@ -5,7 +5,7 @@ LitPrinter Console Module
 Provides a Console class for rich terminal output with styling, markup support,
 and various output methods. Inspired by Rich's Console class.
 
-Author: OEvortex <helpingai5@gmail.com>
+Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
 """
 

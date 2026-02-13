@@ -34,7 +34,7 @@ Usage:
     console.print("[bold red]Error:[/bold red] Something went wrong!")
     print(Panel("Hello!", title="Greeting"))
 
-Author: OEvortex <helpingai5@gmail.com>
+Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
 """
 

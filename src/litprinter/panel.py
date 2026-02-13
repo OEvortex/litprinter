@@ -7,7 +7,7 @@ Supports various border styles, padding, alignment, and sophisticated layout opt
 Enhanced with Rich-inspired features including box styles, text overflow handling,
 background patterns, shadows, and advanced styling capabilities.
 
-Author: OEvortex <helpingai5@gmail.com>
+Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
 """
 

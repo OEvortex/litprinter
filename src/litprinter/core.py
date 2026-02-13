@@ -21,7 +21,7 @@ Usage:
     ic.configureOutput(prefix='DEBUG| ', includeContext=True)
     ic()   # Output: DEBUG| script.py:10 in my_function()
 
-Author: OEvortex <helpingai5@gmail.com>
+Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
 """
 
