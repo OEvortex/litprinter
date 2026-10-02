@@ -35,8 +35,6 @@ from .litprint import (
     enable,
     disable,
     format,
-    set_style,
-    get_style,
     argumentToString,
     IceCreamDebugger,
 )
@@ -49,17 +47,10 @@ from .builtins import DEFAULT_NAMES, install, uninstall
 from .markup import render_markup, strip_markup, supports_color
 
 # ============================================================================
-# Themes (used by ic output and tracebacks)
+# Theme
 # ============================================================================
 
-from .coloring import (
-    TokyoNight,
-    LitStyle,
-    SolarizedDark,
-    CyberpunkStyle,
-    MonokaiStyle,
-    DEFAULT_STYLE,
-)
+from .theme import LitPrinterStyle
 from .colors import Colors
 
 # ============================================================================
@@ -95,7 +86,7 @@ for _name, _value in (
 # Version
 # ============================================================================
 
-__version__ = '0.4.0'
+__version__ = '0.5.0'
 
 
 # ============================================================================
@@ -116,8 +107,6 @@ __all__ = [
     'enable',
     'disable',
     'format',
-    'set_style',
-    'get_style',
     'argumentToString',
     'IceCreamDebugger',
     'LITPrintDebugger',
@@ -129,13 +118,8 @@ __all__ = [
     'render_markup',
     'strip_markup',
     'supports_color',
-    # Themes
-    'TokyoNight',
-    'SolarizedDark',
-    'LitStyle',
-    'CyberpunkStyle',
-    'MonokaiStyle',
-    'DEFAULT_STYLE',
+    # Theme
+    'LitPrinterStyle',
     'Colors',
     # Traceback
     'traceback',

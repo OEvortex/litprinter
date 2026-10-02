@@ -73,6 +73,22 @@ ic.configureOutput(contextMode="always")   # 'auto' | 'always' | 'never'
 ic.configureOutput(contextAbsPath=True)    # absolute paths
 ```
 
+### Rich-like rendering
+
+Values are syntax highlighted automatically and multi-line values hang off the
+first line:
+
+```
+ic| config: {
+        'host': '0.0.0.0',
+        'port': 8080,
+        'tags': ['a', 'b']
+      }
+```
+
+Colors follow the terminal: on for a TTY, off when piped. Force them with
+`FORCE_COLOR=1`, suppress with `NO_COLOR=1`.
+
 ## `ic.print` — drop-in `print()`
 
 Identical signature to builtin `print()`, plus markup and highlighting:
@@ -145,27 +161,56 @@ def format_myclass(obj):
 ic(MyClass("test"))  # ic| MyClass(test)
 ```
 
-## Pretty tracebacks
+## Pretty tracebacks (auto-installed)
+
+Installing litprinter installs the traceback handler too, so every Python
+process gets readable tracebacks with no setup:
+
+```
+── Traceback (most recent call last) ────────── 2026-10-02 11:00:00 ──────────
+
+ZeroDivisionError: division by zero
+
+  File "app.py", line 12, in divide
+     10 │     payload = {"a": a, "b": b}
+  ❱   12 │     return a / b
+
+  Variables:
+  a = 10    payload = {'a': 10, 'b': 0}  [dict]
+  b = 0
+```
+
+Tune it at runtime:
 
 ```python
 from litprinter import traceback
 
 traceback.install(
-    theme="cyberpunk",       # litprinter theme or any Pygments style name
-    show_locals=True,        # show local variables
-    extra_lines=3,           # context lines around the error
-    suppress=["site-packages"],  # hide frames from these paths
-    max_frames=20,           # keep the stack short
-    locals_hide_sunder=True, # hide _private locals
+    show_locals=True,           # show local variables
+    extra_lines=3,              # context lines around the error
+    suppress=["site-packages"], # hide frames from these paths
+    max_frames=20,              # keep the stack short
+    locals_hide_sunder=True,    # hide _private locals
 )
+
+traceback.uninstall()  # back to the default handler
 ```
 
-Uninstall with `traceback.uninstall()`.
+Opt out before Python starts:
 
-Themes available for tracebacks: `JARVIS`, `RICH`, `MODERN`, `NEON`,
-`CYBERPUNK`, `DRACULA`, `MONOKAI`, `SOLARIZED`, `NORD`, `GITHUB`, `VSCODE`,
-`MATERIAL`, `RETRO`, `OCEAN`, `AUTUMN`, `SYNTHWAVE`, `FOREST`, `MONOCHROME`,
-`SUNSET`.
+```bash
+LITPRINTER_NO_TRACEBACK=1 py app.py   # normal traceback, ic() still available
+LITPRINTER_NO_AUTOLOAD=1 py app.py    # litprinter fully inert
+```
+
+## Theme
+
+There is exactly one theme, `LitPrinterStyle`. It is applied automatically to
+`ic()` values, `ic.print(..., highlight=True)` and tracebacks.
+
+```python
+from litprinter import LitPrinterStyle
+```
 
 ## Builtins control
 
@@ -188,22 +233,21 @@ uninstall()   # remove ic from builtins
 | `ic.enable()` / `ic.disable()` | Toggle debug output |
 | `ic.format(*args)` | Format without printing |
 | `ic.install()` / `ic.uninstall()` | (Un)register builtins |
-| `set_style(style)` / `get_style()` | Theme control |
 | `argumentToString.register(Type)` | Custom formatters |
 | `render_markup(text, style=, color=)` | Render markup to ANSI |
+| `LitPrinterStyle` | The single built-in theme |
 | `traceback.install(...)` / `traceback.uninstall()` | Pretty tracebacks |
 
 Aliases: `LIT`, `litprint`, `lit`.
 
-## Removed in 0.4.0
+## Removed
 
-The bundled Rich re-implementation was deleted to keep the package focused:
-`Console`, `console`, `cprint`, `Panel`, `Box`, `Text`, `Span`, `Segment` and
-`Style`. Use `ic.print()` for colored markup, or
-[Rich](https://github.com/Textualize/rich) for full console rendering.
-
-`litprinter.styles` is **still shipped** — it holds the 19 traceback themes
-listed above.
+- **0.5.0**: the 19 bundled themes and `litprinter.styles`, plus `set_style()`
+  and `traceback.install(theme=...)`. One built-in theme remains.
+- **0.4.0**: the bundled Rich re-implementation — `Console`, `console`,
+  `cprint`, `Panel`, `Box`, `Text`, `Span`, `Segment` and `Style`. Use
+  `ic.print()` for colored markup, or
+  [Rich](https://github.com/Textualize/rich) for full console rendering.
 
 ## Migration
 
@@ -223,6 +267,6 @@ from icecream import ic   # before
 
 ## Version
 
-Current version: **0.4.0**
+Current version: **0.5.0**
 
 For more examples, see the [GitHub repository](https://github.com/OEvortex/litprinter).

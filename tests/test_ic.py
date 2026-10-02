@@ -84,8 +84,37 @@ def test_pair_delimiter(out):
     ic.configureOutput(pairDelimiter=' | ')
     a, b = 1, 2
     ic(a, b)
-    assert out[-1] == 'ic| a: 1 | b: 2'
+    assert 'a: 1 | b: 2' in out[-1]
     ic.configureOutput(pairDelimiter=', ')
+
+
+def test_multiline_value_is_auto_aligned(out):
+    """Continuation lines hang under the value column, not column 0."""
+    data = {'alpha': 1, 'beta': 2, 'gamma': 3, 'delta': 4, 'epsilon': 5}
+    ic(data)
+    lines = out[-1].split('\n')
+    assert len(lines) > 1
+    assert lines[0].startswith('ic| data: {')
+    # Every continuation line is indented past the first column.
+    assert all(line.startswith(' ') for line in lines[1:])
+
+
+def test_alignment_accounts_for_context(out):
+    """The indent accounts for the prefix *and* the context column."""
+    big = {'alpha': 1, 'beta': 2, 'gamma': 3, 'delta': 4, 'epsilon': 5}
+    ic(big, includeContext=True)
+    lines = out[-1].split('\n')
+    assert len(lines) > 1
+    # Indented past the prefix *and* the context column.
+    assert lines[1].startswith(' ' * 25)
+
+
+def test_single_theme_is_used():
+    import litprinter
+
+    assert not hasattr(litprinter, 'set_style')
+    assert not hasattr(litprinter, 'get_style')
+    assert litprinter.LitPrinterStyle is not None
 
 
 def test_invalid_context_mode():

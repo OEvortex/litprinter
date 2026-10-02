@@ -34,12 +34,7 @@ import sys
 import time
 from typing import IO, Any, Callable, Optional, Union
 
-from .core import (
-    IceCreamDebugger,
-    argumentToString,
-    set_style,
-    get_style,
-)
+from .core import IceCreamDebugger, argumentToString
 from .markup import render_markup, supports_color
 
 
@@ -420,6 +415,4 @@ __all__ = [
     # Core exports
     'argumentToString',
     'IceCreamDebugger',
-    'set_style',
-    'get_style',
 ]

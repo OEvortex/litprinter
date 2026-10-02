@@ -2,7 +2,6 @@
 
 import sys
 
-import pytest
 
 from litprinter import traceback
 from litprinter.traceback import PrettyTraceback
@@ -76,38 +75,44 @@ def test_is_suppressed_is_case_insensitive():
     assert not tb.is_suppressed('/x/other.py')
 
 
-def test_every_custom_theme_resolves():
-    for name, cls in traceback.CUSTOM_STYLES.items():
-        assert cls is not None, name
+def test_single_builtin_theme():
+    """There is exactly one style, shared by ic() and the traceback."""
+    from litprinter import LitPrinterStyle
+
+    assert make_tb().style_cls is LitPrinterStyle
+    assert not hasattr(traceback, 'CUSTOM_STYLES')
 
 
-def test_unknown_theme_warns_and_falls_back(capsys):
-    try:
-        traceback.install(theme='definitely-not-a-theme')
-        assert traceback._current_hook_options['theme'] == 'cyberpunk'
-    finally:
-        traceback.uninstall()
-    assert 'not found' in capsys.readouterr().err
+def test_theme_argument_is_gone():
+    import inspect
 
-
-def test_bad_theme_type_warns(capsys):
-    try:
-        traceback.install(theme=42)
-        assert traceback._current_hook_options['theme'] == 'cyberpunk'
-    finally:
-        traceback.uninstall()
-    assert 'must be a string or Style class' in capsys.readouterr().err
+    assert 'theme' not in inspect.signature(traceback.install).parameters
+    assert (
+        'theme' not in inspect.signature(traceback.PrettyTraceback.__init__).parameters
+    )
 
 
 def test_install_and_uninstall_roundtrip():
-    original = sys.excepthook
+    # The .pth autoloader installs the hook at interpreter startup, so
+    # uninstall() must restore the interpreter's own default hook.
+    assert sys.excepthook is traceback.pretty_excepthook
     try:
-        traceback.install(show_locals=True, theme='monokai')
+        traceback.install(show_locals=True)
         assert sys.excepthook is traceback.pretty_excepthook
         assert traceback._current_hook_options['show_locals'] is True
     finally:
         traceback.uninstall()
-    assert sys.excepthook is original
+    assert sys.excepthook is sys.__excepthook__
+
+
+def test_reinstall_after_uninstall():
+    traceback.uninstall()
+    assert sys.excepthook is sys.__excepthook__
+    try:
+        traceback.install()
+        assert sys.excepthook is traceback.pretty_excepthook
+    finally:
+        traceback.uninstall()
 
 
 def test_install_forwards_new_options():
@@ -136,10 +141,9 @@ def test_str_and_print(tmp_path, capsys):
     assert 'ZeroDivisionError' in capsys.readouterr().err
 
 
-@pytest.mark.parametrize('theme', ['cyberpunk', 'dracula', 'nord', 'monokai'])
-def test_install_accepts_each_theme(theme):
+def test_install_does_not_carry_a_theme():
     try:
-        traceback.install(theme=theme)
-        assert traceback._current_hook_options['theme'] == theme
+        traceback.install()
+        assert 'theme' not in traceback._current_hook_options
     finally:
         traceback.uninstall()

@@ -1,29 +1,22 @@
 #!/usr/bin/env python3
 """
-
 LitPrinter Traceback Module
 
-Enhanced traceback formatting with syntax highlighting and improved readability.
-This module provides a more user-friendly traceback display with:
-- Syntax highlighting using Pygments (if available)
-- Local variable inspection with smart formatting
-- Better visual formatting of error information
-- Support for exception chaining visualization
-- Customizable themes and styling options
-- Terminal width detection and adaptive display
+Readable, syntax-highlighted tracebacks with local variable inspection.
 
-Usage:
-    from litprinter.traceback import install
-    install(show_locals=True, theme="cyberpunk")
+The hook is installed automatically when litprinter is installed, so you
+normally get this output with no setup at all. To change it:
 
-    # Your code that might raise exceptions
-    # ...
+    from litprinter import traceback
 
-Available themes (when Pygments is installed):
-    - Built-in Pygments themes: monokai, friendly, colorful, etc.
-    - Custom themes: jarvis, rich, modern, neon, cyberpunk, dracula, monokai, solarized,
-      nord, github, vscode, material, retro, ocean, autumn, synthwave, forest, monochrome,
-      sunset, etc.
+    traceback.install(
+        show_locals=True,
+        extra_lines=3,
+        suppress=["site-packages"],
+    )
+
+Opt out entirely (before Python starts) with ``LITPRINTER_NO_TRACEBACK=1``,
+and restore the default handler at runtime with ``traceback.uninstall()``.
 
 Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
@@ -37,7 +30,14 @@ import pprint
 import shutil
 import datetime
 from dataclasses import dataclass, field
-from types import TracebackType, FrameType, ModuleType, FunctionType, BuiltinFunctionType, MethodType
+from types import (
+    TracebackType,
+    FrameType,
+    ModuleType,
+    FunctionType,
+    BuiltinFunctionType,
+    MethodType,
+)
 from typing import (
     Any,
     Callable,
@@ -55,40 +55,14 @@ from pygments import highlight
 from pygments.lexers import guess_lexer_for_filename
 from pygments.lexers.python import PythonLexer
 from pygments.lexers.special import TextLexer
-from pygments.formatters.terminal256 import Terminal256Formatter as _Terminal256Formatter
-from pygments.style import Style as PygmentsStyle
-from pygments.styles import get_style_by_name
+from pygments.formatters.terminal256 import (
+    Terminal256Formatter as _Terminal256Formatter,
+)
 from pygments.util import ClassNotFound
 
 from .colors import Colors
-from .styles import (
-    JARVIS, RICH, MODERN, NEON, CYBERPUNK, DRACULA, MONOKAI,
-    SOLARIZED, NORD, GITHUB, VSCODE, MATERIAL, RETRO, OCEAN,
-    AUTUMN, SYNTHWAVE, FOREST, MONOCHROME, SUNSET,
-)
-
-# Mapping of the theme names accepted by install(theme=...) to style classes
-CUSTOM_STYLES = {
-    "jarvis": JARVIS,
-    "rich": RICH,
-    "modern": MODERN,
-    "neon": NEON,
-    "cyberpunk": CYBERPUNK,
-    "dracula": DRACULA,
-    "monokai": MONOKAI,
-    "solarized": SOLARIZED,
-    "nord": NORD,
-    "github": GITHUB,
-    "vscode": VSCODE,
-    "material": MATERIAL,
-    "retro": RETRO,
-    "ocean": OCEAN,
-    "autumn": AUTUMN,
-    "synthwave": SYNTHWAVE,
-    "forest": FOREST,
-    "monochrome": MONOCHROME,
-    "sunset": SUNSET,
-}
+from .render import visible_width
+from .theme import LitPrinterStyle
 
 # Type alias for the frame-suppression patterns
 SuppressType = Iterable[str]
@@ -101,26 +75,40 @@ MAX_VARIABLES = 15
 MAX_VARIABLE_LENGTH = 100
 # Maximum depth for nested structures in locals
 LOCALS_MAX_DEPTH = 2
-# Default theme for syntax highlighting
-DEFAULT_THEME = "cyberpunk"
 # Number of extra lines to show around the error line
 DEFAULT_EXTRA_LINES = 5
 # Default terminal width if detection fails
 DEFAULT_WIDTH = 100
 # Separator for stack traces
-STACK_SEPARATOR = "═"
+STACK_SEPARATOR = '─'
 # Marker for the error line
-ERROR_LINE_MARKER = "❱"
+ERROR_LINE_MARKER = '❱'
 # Marker for code line numbers
-LINE_SEPARATOR = "│"
+LINE_SEPARATOR = '│'
 # Module-level names hidden from show_locals (this module's own machinery)
-_MODULE_LEVEL_NOISE = frozenset({
-    "PrettyTraceback", "FrameInfo", "_SyntaxError", "Stack", "Trace",
-    "Styles", "install", "uninstall", "Traceback", "PygmentsStyle",
-    "CUSTOM_STYLES", "DEFAULT_THEME", "DEFAULT_EXTRA_LINES", "DEFAULT_WIDTH",
-    "MAX_VARIABLES", "MAX_VARIABLE_LENGTH", "LOCALS_MAX_DEPTH",
-    "STACK_SEPARATOR", "ERROR_LINE_MARKER", "LINE_SEPARATOR",
-})
+_MODULE_LEVEL_NOISE = frozenset(
+    {
+        'PrettyTraceback',
+        'FrameInfo',
+        '_SyntaxError',
+        'Stack',
+        'Trace',
+        'Styles',
+        'install',
+        'uninstall',
+        'Traceback',
+        'LitPrinterStyle',
+        'DEFAULT_EXTRA_LINES',
+        'DEFAULT_WIDTH',
+        'MAX_VARIABLES',
+        'MAX_VARIABLE_LENGTH',
+        'LOCALS_MAX_DEPTH',
+        'STACK_SEPARATOR',
+        'ERROR_LINE_MARKER',
+        'LINE_SEPARATOR',
+    }
+)
+
 
 # --- ANSI Color Codes & Styles ---
 class Styles:
@@ -130,6 +118,7 @@ class Styles:
     using ANSI color codes from the Colors class. Each method applies specific styling
     to different elements of the traceback for better visual distinction.
     """
+
     # Use Colors class from colors.py for ANSI codes
     RESET = Colors.RESET
     BOLD = Colors.BOLD
@@ -173,12 +162,12 @@ class Styles:
     @staticmethod
     def LibraryIndicator(text: str) -> str:
         """Style for library indicators in tracebacks."""
-        return Styles.Muted(f"[{str(text)}]")
+        return Styles.Muted(f'[{str(text)}]')
 
     @staticmethod
     def ModuleName(text: str) -> str:
         """Style for module names in tracebacks."""
-        return Styles.Muted(f"{str(text)}")
+        return Styles.Muted(f'{str(text)}')
 
     @staticmethod
     def Error(text: str) -> str:
@@ -260,44 +249,53 @@ class Styles:
         """Remove all ANSI escape sequences from text."""
         return Colors.strip_ansi(text)
 
+
 # --- Data Classes ---
 @dataclass
 class FrameInfo:
     """Information about a single frame in the traceback."""
+
     frame_obj: Optional[FrameType]  # The actual frame object
-    filename: str                   # File where the frame is located
-    lineno: int                     # Line number in the file
-    name: str                       # Function name
-    line: str = ""                  # Source code line
+    filename: str  # File where the frame is located
+    lineno: int  # Line number in the file
+    name: str  # Function name
+    line: str = ''  # Source code line
     locals: Optional[Dict[str, Any]] = None  # Local variables
-    is_module_frame: bool = False   # Whether this is a module-level frame
-    is_library_file: bool = False   # Whether this is from a library file
+    is_module_frame: bool = False  # Whether this is a module-level frame
+    is_library_file: bool = False  # Whether this is from a library file
+
 
 @dataclass
 class _SyntaxError:
     """Information about a syntax error."""
+
     offset: Optional[int]  # Character offset where the error occurred
-    filename: str          # File where the error occurred
-    line: str              # Source code line with the error
-    lineno: int            # Line number in the file
-    msg: str               # Error message
+    filename: str  # File where the error occurred
+    line: str  # Source code line with the error
+    lineno: int  # Line number in the file
+    msg: str  # Error message
+
 
 @dataclass
 class Stack:
     """Information about an exception stack."""
-    exc_type: str          # Exception type name
-    exc_value: str         # Exception value as string
-    exc_type_full: str     # Full exception type
+
+    exc_type: str  # Exception type name
+    exc_value: str  # Exception value as string
+    exc_type_full: str  # Full exception type
     syntax_error: Optional[_SyntaxError] = None  # Syntax error info if applicable
     is_cause: bool = False  # Whether this is a cause of another exception
     is_context: bool = False  # Whether this is a context of another exception
     frames: List[FrameInfo] = field(default_factory=list)  # Stack frames
     omitted_frames: int = 0  # How many frames max_frames dropped
 
+
 @dataclass
 class Trace:
     """Complete trace information with all exception stacks."""
+
     stacks: List[Stack]  # List of exception stacks
+
 
 # --- Core Traceback Logic ---
 class PrettyTraceback:
@@ -309,14 +307,12 @@ class PrettyTraceback:
     - Better visual formatting of error information
     - Support for exception chaining
     - Frame suppression for cleaner output
-    - Customizable themes
 
     Args:
         exc_type: The exception type
         exc_value: The exception value
         tb: The traceback object
         extra_lines: Number of extra lines to show around the error line
-        theme: The syntax highlighting theme to use
         show_locals: Whether to show local variables
         locals_max_string: Maximum length for string variables
         locals_max_depth: Maximum depth for nested structures
@@ -325,8 +321,8 @@ class PrettyTraceback:
         width: Terminal width (auto-detected if None)
         suppress: Paths/modules to suppress from traceback
         max_frames: Maximum number of frames to show
-        _selected_pygments_style_cls: Pre-selected Pygments style class
     """
+
     def __init__(
         self,
         exc_type: Type[BaseException],
@@ -334,7 +330,6 @@ class PrettyTraceback:
         tb: Optional[TracebackType],
         *,
         extra_lines: int = DEFAULT_EXTRA_LINES,
-        theme: Any = DEFAULT_THEME,
         show_locals: bool = False,
         locals_max_string: int = MAX_VARIABLE_LENGTH,
         locals_max_depth: int = LOCALS_MAX_DEPTH,
@@ -343,7 +338,6 @@ class PrettyTraceback:
         width: Optional[int] = None,
         suppress: SuppressType = (),
         max_frames: int = 100,
-        _selected_pygments_style_cls: Optional[Type[PygmentsStyle]] = None,
     ):
         self.exc_type = exc_type
         self.exc_value = exc_value
@@ -357,33 +351,19 @@ class PrettyTraceback:
         self.terminal_width = width or self._get_terminal_width()
         self.suppress = set(suppress)
         self.max_frames = max_frames
-        self._pp = pprint.PrettyPrinter(depth=self.locals_max_depth, width=max(20, self.terminal_width - 20), compact=True)
+        self._pp = pprint.PrettyPrinter(
+            depth=self.locals_max_depth,
+            width=max(20, self.terminal_width - 20),
+            compact=True,
+        )
 
-        self.formatter = None
-        self.style_cls = None
-        # Use the pre-selected style class if provided by install()
-        if _selected_pygments_style_cls:
-            self.style_cls = _selected_pygments_style_cls
-        else: # Determine style class if running standalone
-            if isinstance(theme, str):
-                self.style_cls = CUSTOM_STYLES.get(theme.lower())
-            if not self.style_cls and isinstance(theme, str):
-                try:
-                    self.style_cls = get_style_by_name(theme)
-                except ClassNotFound:
-                    pass
-            if not self.style_cls:
-                self.style_cls = (
-                    CUSTOM_STYLES.get(DEFAULT_THEME.lower())
-                    or get_style_by_name('default')
-                )
-
-            # Pass the CLASS to the formatter; on failure fall back to plain text
-            if self.style_cls:
-                try:
-                    self.formatter = _Terminal256Formatter(style=self.style_cls)
-                except Exception:
-                    self.formatter = None
+        # One style for the whole package; fall back to plain text if the
+        # formatter cannot be built.
+        self.style_cls = LitPrinterStyle
+        try:
+            self.formatter = _Terminal256Formatter(style=self.style_cls)
+        except Exception:
+            self.formatter = None
 
         self.trace = self._extract_trace()
 
@@ -401,7 +381,7 @@ class PrettyTraceback:
         try:
             return str(obj)
         except Exception:
-            return "<exception str() failed>"
+            return '<exception str() failed>'
 
     @staticmethod
     def _is_library_file(filename: str) -> bool:
@@ -414,8 +394,7 @@ class PrettyTraceback:
             if stdlib_dir and abs_path.startswith(stdlib_dir):
                 return True
             site_packages_dirs = [
-                p for p in sys.path
-                if 'site-packages' in p or 'dist-packages' in p
+                p for p in sys.path if 'site-packages' in p or 'dist-packages' in p
             ]
             return any(abs_path.startswith(p) for p in site_packages_dirs)
         except Exception:
@@ -430,15 +409,16 @@ class PrettyTraceback:
         hide_sunder: bool,
     ) -> bool:
         """Decide whether a local variable should be hidden from show_locals."""
-        if hide_dunder and key.startswith("__") and key.endswith("__"):
+        if hide_dunder and key.startswith('__') and key.endswith('__'):
             return True
-        if hide_sunder and key.startswith("_") and not key.startswith("__"):
+        if hide_sunder and key.startswith('_') and not key.startswith('__'):
             return True
         if frame_is_module:
-            if isinstance(value, (ModuleType, FunctionType, type,
-                                  BuiltinFunctionType, MethodType)):
+            if isinstance(
+                value, (ModuleType, FunctionType, type, BuiltinFunctionType, MethodType)
+            ):
                 return True
-            # Module-level noise: this module's own machinery and themes.
+            # Module-level noise: this module's own machinery.
             if key in _MODULE_LEVEL_NOISE:
                 return True
         return False
@@ -464,14 +444,32 @@ class PrettyTraceback:
             # Detect cycles in the exception chain to prevent infinite loops
             exception_id = id(current_exc_value)
             if exception_id in processed_exceptions:
-                print(Styles.WARNING_STYLE + "WARNING: Detected cycle in exception chain." + Styles.RESET, file=sys.stderr)
+                print(
+                    Styles.WARNING_STYLE
+                    + 'WARNING: Detected cycle in exception chain.'
+                    + Styles.RESET,
+                    file=sys.stderr,
+                )
                 break
             processed_exceptions.add(exception_id)
 
             # Determine the relationship between this exception and the previous one
-            is_cause = bool(stacks and getattr(stacks[-1].exc_value, '__cause__', None) is current_exc_value)
-            suppress_ctx = getattr(stacks[-1].exc_value, '__suppress_context__', False) if stacks else False
-            is_context = bool(stacks and getattr(stacks[-1].exc_value, '__context__', None) is current_exc_value and not suppress_ctx)
+            is_cause = bool(
+                stacks
+                and getattr(stacks[-1].exc_value, '__cause__', None)
+                is current_exc_value
+            )
+            suppress_ctx = (
+                getattr(stacks[-1].exc_value, '__suppress_context__', False)
+                if stacks
+                else False
+            )
+            is_context = bool(
+                stacks
+                and getattr(stacks[-1].exc_value, '__context__', None)
+                is current_exc_value
+                and not suppress_ctx
+            )
 
             # Create a Stack object for this exception
             stack = Stack(
@@ -479,17 +477,17 @@ class PrettyTraceback:
                 exc_value=self._safe_str(current_exc_value),
                 exc_type_full=str(current_exc_type),
                 is_cause=is_cause,
-                is_context=is_context
+                is_context=is_context,
             )
 
             # Handle SyntaxError specially
             if isinstance(current_exc_value, SyntaxError):
                 stack.syntax_error = _SyntaxError(
                     offset=current_exc_value.offset,
-                    filename=current_exc_value.filename or "?",
+                    filename=current_exc_value.filename or '?',
                     lineno=current_exc_value.lineno or 0,
-                    line=current_exc_value.text or "",
-                    msg=current_exc_value.msg
+                    line=current_exc_value.text or '',
+                    msg=current_exc_value.msg,
                 )
 
             # Extract frames from the traceback
@@ -503,28 +501,34 @@ class PrettyTraceback:
                             is_first = False
                             continue
                         is_module = is_first and (not frame_obj.f_back)
-                        extracted_frames.append(self._extract_single_frame(frame_obj, lineno, is_module))
+                        extracted_frames.append(
+                            self._extract_single_frame(frame_obj, lineno, is_module)
+                        )
                         is_first = False
                     if len(extracted_frames) > self.max_frames:
                         # Keep the frames closest to the error.
                         omitted = len(extracted_frames) - self.max_frames
-                        extracted_frames = extracted_frames[-self.max_frames:]
+                        extracted_frames = extracted_frames[-self.max_frames :]
                         stack.frames = extracted_frames
                         stack.omitted_frames = omitted
                     else:
                         stack.frames = extracted_frames
                 except Exception as e:
-                    error_msg = f"ERROR: Could not extract frames using walk_tb: {e}"
-                    print(Styles.ERROR_STYLE + error_msg + Styles.RESET, file=sys.stderr)
+                    error_msg = f'ERROR: Could not extract frames using walk_tb: {e}'
+                    print(
+                        Styles.ERROR_STYLE + error_msg + Styles.RESET, file=sys.stderr
+                    )
 
             # Clear the linecache to ensure we get fresh source lines
             linecache.clearcache()
             stacks.append(stack)
 
             # Find the next exception in the chain
-            next_cause = getattr(current_exc_value, "__cause__", None)
-            next_context = getattr(current_exc_value, "__context__", None)
-            next_suppress_context = getattr(current_exc_value, "__suppress_context__", False)
+            next_cause = getattr(current_exc_value, '__cause__', None)
+            next_context = getattr(current_exc_value, '__context__', None)
+            next_suppress_context = getattr(
+                current_exc_value, '__suppress_context__', False
+            )
 
             # Prioritize explicit causes over implicit contexts
             if next_cause is not None:
@@ -545,7 +549,9 @@ class PrettyTraceback:
         # Return the trace with stacks in chronological order (reversed)
         return Trace(stacks=list(reversed(stacks)))
 
-    def _extract_single_frame(self, frame_obj: FrameType, lineno: int, is_module: bool) -> FrameInfo:
+    def _extract_single_frame(
+        self, frame_obj: FrameType, lineno: int, is_module: bool
+    ) -> FrameInfo:
         """Extract information from a single frame in the traceback.
 
         Args:
@@ -558,8 +564,8 @@ class PrettyTraceback:
         """
         # Extract basic frame information
         f_code = frame_obj.f_code
-        filename = f_code.co_filename or "?"
-        func_name = f_code.co_name or "?"
+        filename = f_code.co_filename or '?'
+        func_name = f_code.co_name or '?'
         is_lib = self._is_library_file(filename)
 
         # Get the source line from the cache
@@ -568,7 +574,7 @@ class PrettyTraceback:
             line = linecache.getline(filename, lineno, frame_obj.f_globals).strip()
         except Exception:
             # Handle any errors in line retrieval
-            line = "<error retrieving source line>"
+            line = '<error retrieving source line>'
 
         # Extract and filter local variables if requested
         frame_locals_filtered = None
@@ -576,15 +582,19 @@ class PrettyTraceback:
             try:
                 frame_locals_unfiltered = frame_obj.f_locals
                 frame_locals_filtered = {
-                    k: v for k, v in frame_locals_unfiltered.items()
+                    k: v
+                    for k, v in frame_locals_unfiltered.items()
                     if not self._is_skippable_local(
-                        k, v, is_module, self.locals_hide_dunder,
+                        k,
+                        v,
+                        is_module,
+                        self.locals_hide_dunder,
                         self.locals_hide_sunder,
                     )
                 }
             except Exception:
                 # If we can't access locals, provide a placeholder
-                frame_locals_filtered = {"<error>": "<error accessing local variables>"}
+                frame_locals_filtered = {'<error>': '<error accessing local variables>'}
 
         # Create and return the FrameInfo object
         return FrameInfo(
@@ -595,7 +605,7 @@ class PrettyTraceback:
             line=line,
             locals=frame_locals_filtered,
             is_module_frame=is_module,
-            is_library_file=is_lib
+            is_library_file=is_lib,
         )
 
     # --- Formatting Helpers ---
@@ -603,19 +613,21 @@ class PrettyTraceback:
         """Colour a repr() string according to the kind of value it holds."""
         val = value_repr.strip()
 
-        if val in ("None", "True", "False"):
-            return Styles.ValueNone(val) if val == "None" else Styles.ValueBool(val)
+        if val in ('None', 'True', 'False'):
+            return Styles.ValueNone(val) if val == 'None' else Styles.ValueBool(val)
 
-        if len(val) >= 2 and val[0] == val[-1] and val[0] in "'\"":
+        if len(val) >= 2 and val[0] == val[-1] and val[0] in '\'"':
             return Styles.ValueStr(val)
 
-        if val.lstrip("-").replace(".", "", 1).isdigit():
+        if val.lstrip('-').replace('.', '', 1).isdigit():
             return Styles.ValueNum(val)
 
-        if val.startswith(("<class ", "<function ", "<module ", "<bound method ")):
+        if val.startswith(('<class ', '<function ', '<module ', '<bound method ')):
             return Styles.ValueType(val)
 
-        if val.startswith(("{", "[", "(")) or (val.startswith("<") and val.endswith(">")):
+        if val.startswith(('{', '[', '(')) or (
+            val.startswith('<') and val.endswith('>')
+        ):
             return Styles.ValueContainer(val)
 
         return Styles.LocalsValue(val)
@@ -631,19 +643,22 @@ class PrettyTraceback:
         for name, value in sorted_items:
             if count >= MAX_VARIABLES:
                 remaining = len(sorted_items) - count
-                formatted_vars.append((
-                    Styles.Dim("..."),
-                    Styles.Dim(f"<{remaining} more variables>")
-                ))
+                formatted_vars.append(
+                    (Styles.Dim('...'), Styles.Dim(f'<{remaining} more variables>'))
+                )
                 break
             try:
                 value_repr = self._pp.pformat(value)
                 if len(value_repr) > self.locals_max_string:
-                    value_repr = value_repr[:self.locals_max_string - 1] + "…"
-                type_str = f"  {Styles.Dim('[' + type(value).__name__ + ']')}" if not isinstance(value, (int, float, str, bool, type(None))) else ""
+                    value_repr = value_repr[: self.locals_max_string - 1] + '…'
+                type_str = (
+                    f'  {Styles.Dim("[" + type(value).__name__ + "]")}'
+                    if not isinstance(value, (int, float, str, bool, type(None)))
+                    else ''
+                )
             except Exception:
-                value_repr = Styles.Error("<exception repr() failed>")
-                type_str = ""
+                value_repr = Styles.Error('<exception repr() failed>')
+                type_str = ''
             colored_value = self._color_code_value(value_repr) + type_str
             formatted_vars.append((Styles.LocalsKey(name), colored_value))
             count += 1
@@ -653,20 +668,29 @@ class PrettyTraceback:
         col1_width = 0
         if num_vars > 0:
             try:
-                col1_width = max(len(Styles.strip_styles(k)) for k, _ in formatted_vars[:mid_point]) + 3
+                col1_width = (
+                    max(
+                        len(Styles.strip_styles(k))
+                        for k, _ in formatted_vars[:mid_point]
+                    )
+                    + 3
+                )
             except ValueError:
                 col1_width = 3
         for i in range(mid_point):
             key1, val1 = formatted_vars[i]
             key1_clean_len = len(Styles.strip_styles(key1))
-            key1_padded = key1 + " " * max(0, col1_width - key1_clean_len - 3)
-            line = f"  {key1_padded} {Styles.LocalsEquals('=')} {val1}"
+            key1_padded = key1 + ' ' * max(0, col1_width - key1_clean_len - 3)
+            line = f'  {key1_padded} {Styles.LocalsEquals("=")} {val1}'
             j = i + mid_point
             if j < num_vars:
                 key2, val2 = formatted_vars[j]
-                line += f"    {Styles.LocalsKey(key2)} {Styles.LocalsEquals('=')} {val2}"
+                line += (
+                    f'    {Styles.LocalsKey(key2)} {Styles.LocalsEquals("=")} {val2}'
+                )
             lines.append(line)
         return lines
+
     def _format_syntax_error(self, error: _SyntaxError) -> Iterable[str]:
         """Format a syntax error for display.
 
@@ -680,30 +704,33 @@ class PrettyTraceback:
             Formatted lines for the syntax error display
         """
         # Add a blank line before the error header
-        yield ""
+        yield ''
 
         # Display the error header with filename and line number
-        yield Styles.ErrorBold(f"Syntax Error in {Styles.FilePath(error.filename)} at line {Styles.LineNo(str(error.lineno))}:")
+        yield Styles.ErrorBold(
+            f'Syntax Error in {Styles.FilePath(error.filename)} at line {Styles.LineNo(str(error.lineno))}:'
+        )
 
         # Add a blank line after the header
-        yield ""
+        yield ''
 
         # Show the line with the syntax error
         if error.line:
-            yield f"  {error.line.rstrip()}"
+            yield f'  {error.line.rstrip()}'
 
             # Add the error marker (^) pointing to the exact position of the error
             if error.offset is not None and error.offset > 0:
                 marker_pos = error.offset - 1
-                yield f"  {' ' * marker_pos}{Styles.ErrorBold('^')}"
+                yield f'  {" " * marker_pos}{Styles.ErrorBold("^")}'
         else:
-            yield Styles.Muted("  [Source line not available]")
+            yield Styles.Muted('  [Source line not available]')
 
         # Add a blank line before the error message
-        yield ""
+        yield ''
 
         # Show the error message
         yield Styles.Error(error.msg)
+
     def _format_exception_message(self, stack: Stack) -> str:
         """Format the main exception message.
 
@@ -713,18 +740,45 @@ class PrettyTraceback:
         Returns:
             A formatted string with the exception type and message
         """
-        return f"{Styles.ErrorBold(stack.exc_type)}: {Styles.Error(stack.exc_value)}"
+        return f'{Styles.ErrorBold(stack.exc_type)}: {Styles.Error(stack.exc_value)}'
 
     # --- Main Rendering Logic ---
+    def _format_header(self, term_width: int, timestamp: str) -> str:
+        """Render the top banner, e.g. ``--- Traceback (most recent call last) ---``."""
+        label = Styles.ErrorBold('Traceback (most recent call last)')
+        stamp = Styles.Muted(timestamp)
+        fill = max(0, term_width - visible_width(label) - visible_width(stamp) - 6)
+        return (
+            f'{Styles.Error("─" * 2)} {label} '
+            f'{Styles.Error("─" * max(0, fill // 2))} {stamp} '
+            f'{Styles.Error("─" * (fill - fill // 2))}'
+        )
+
     def _format_frame_header(self, frame_info: FrameInfo) -> str:
-        """Format the header line for a stack frame."""
-        file_info = Styles.FilePath(frame_info.filename)
-        line_info = Styles.LineNo(str(frame_info.lineno))
+        """Format the header line for a stack frame.
+
+        Library frames are dimmed end to end so the frames in the user's own
+        code stand out, and are tagged ``[library]`` instead of carrying the
+        module name twice.
+        """
         func_info = Styles.FunctionName(frame_info.name)
-        module_name = frame_info.frame_obj.f_globals.get('__name__', '') if frame_info.frame_obj else ''
-        module_info_styled = Styles.ModuleName(module_name) if module_name else ""
-        lib_indicator = Styles.LibraryIndicator("Library") if frame_info.is_library_file else ""
-        return f"  File \"{file_info}\", line {line_info}, in {func_info} {module_info_styled} {lib_indicator}"
+        line_info = Styles.LineNo(str(frame_info.lineno))
+
+        if frame_info.is_library_file:
+            return (
+                f'  {Styles.Muted(os.path.basename(frame_info.filename))}'
+                f'{Styles.LineNo(f":{frame_info.lineno}")} {func_info}'
+                f' {Styles.LibraryIndicator("library")}'
+            )
+
+        module_name = ''
+        if frame_info.frame_obj:
+            module_name = frame_info.frame_obj.f_globals.get('__name__', '') or ''
+        location = Styles.FilePath(frame_info.filename)
+        parts = [f'  File "{location}", line {line_info}, in {func_info}']
+        if module_name and module_name != '__main__':
+            parts.append(f' {Styles.ModuleName(module_name)}')
+        return ''.join(parts)
 
     def _format_code_context(self, frame_info: FrameInfo) -> List[str]:
         """Format the code context for a stack frame with syntax highlighting.
@@ -743,7 +797,7 @@ class PrettyTraceback:
         lines_available = False
 
         # Only try to get source code if we have a valid filename and line number
-        if frame_info.filename != "?" and frame_info.lineno > 0:
+        if frame_info.filename != '?' and frame_info.lineno > 0:
             try:
                 # Get all lines from the file
                 lines_for_snippet = linecache.getlines(frame_info.filename)
@@ -753,10 +807,14 @@ class PrettyTraceback:
 
                     # Calculate the range of lines to show
                     start_line_idx = max(0, frame_info.lineno - 1 - self.extra_lines)
-                    end_line_idx = min(len(lines_for_snippet), frame_info.lineno + self.extra_lines)
+                    end_line_idx = min(
+                        len(lines_for_snippet), frame_info.lineno + self.extra_lines
+                    )
 
                     # Join the lines into a single string for highlighting
-                    code_snippet = "".join(lines_for_snippet[start_line_idx:end_line_idx])
+                    code_snippet = ''.join(
+                        lines_for_snippet[start_line_idx:end_line_idx]
+                    )
                     highlighted_code = code_snippet
 
                     # Apply syntax highlighting if Pygments is available
@@ -765,9 +823,14 @@ class PrettyTraceback:
                         lexer = TextLexer()
 
                         # Try to guess the appropriate lexer based on the filename
-                        if frame_info.filename != "<string>" and not frame_info.filename.startswith('<'):
+                        if (
+                            frame_info.filename != '<string>'
+                            and not frame_info.filename.startswith('<')
+                        ):
                             try:
-                                lexer = guess_lexer_for_filename(frame_info.filename, code_snippet)
+                                lexer = guess_lexer_for_filename(
+                                    frame_info.filename, code_snippet
+                                )
                             except ClassNotFound:
                                 # If we can't guess the lexer, default to Python for .py files
                                 if frame_info.filename.endswith('.py'):
@@ -778,7 +841,9 @@ class PrettyTraceback:
 
                         try:
                             # Apply the highlighting
-                            highlighted_code = highlight(code_snippet, lexer, self.formatter).strip()
+                            highlighted_code = highlight(
+                                code_snippet, lexer, self.formatter
+                            ).strip()
                         except Exception:
                             # Fall back to non-highlighted code on any error
                             pass
@@ -787,23 +852,33 @@ class PrettyTraceback:
                     current_line_no = start_line_idx + 1
                     for line_content in highlighted_code.splitlines():
                         line_content = line_content.rstrip()
-                        is_error_line = (current_line_no == frame_info.lineno)
+                        is_error_line = current_line_no == frame_info.lineno
 
                         # Use error marker for the error line, space for others
-                        marker = Styles.ErrorMarker(ERROR_LINE_MARKER) if is_error_line else " "
+                        marker = (
+                            Styles.ErrorMarker(ERROR_LINE_MARKER)
+                            if is_error_line
+                            else ' '
+                        )
 
                         # Format line number with consistent width
-                        line_num_str = f"{current_line_no:>{4}}"
+                        line_num_str = f'{current_line_no:>{4}}'
 
                         # Highlight the line number for the error line
-                        line_num_styled = Styles.LineNo(line_num_str) if is_error_line else Styles.Muted(line_num_str)
+                        line_num_styled = (
+                            Styles.LineNo(line_num_str)
+                            if is_error_line
+                            else Styles.Muted(line_num_str)
+                        )
 
                         # Make the error line bold
-                        styled_line_content = Styles.Bold(line_content) if is_error_line else line_content
+                        styled_line_content = (
+                            Styles.Bold(line_content) if is_error_line else line_content
+                        )
 
                         # Assemble the final line
                         code_context_lines.append(
-                            f"  {marker} {line_num_styled} {LINE_SEPARATOR} {styled_line_content}"
+                            f'  {marker} {line_num_styled} {LINE_SEPARATOR} {styled_line_content}'
                         )
                         current_line_no += 1
             except Exception:
@@ -816,30 +891,40 @@ class PrettyTraceback:
                 # If we at least have the error line, show it
                 # Format the line number first to ensure padding is applied
                 # before adding ANSI styles so alignment isn't affected
-                line_num_str = f"{frame_info.lineno:>4}"
+                line_num_str = f'{frame_info.lineno:>4}'
                 styled_line_num = Styles.LineNo(line_num_str)
                 code_context_lines.append(
-                    f"  {Styles.ErrorMarker(ERROR_LINE_MARKER)} {styled_line_num} {LINE_SEPARATOR} {Styles.Bold(frame_info.line)}"
+                    f'  {Styles.ErrorMarker(ERROR_LINE_MARKER)} {styled_line_num} {LINE_SEPARATOR} {Styles.Bold(frame_info.line)}'
                 )
             else:
                 # Otherwise show a message
-                code_context_lines.append(f"  {Styles.Muted('[Source code not available]')}")
+                code_context_lines.append(
+                    f'  {Styles.Muted("[Source code not available]")}'
+                )
 
         return code_context_lines
 
     def _format_stack_transition(self, stack: Stack, term_width: int) -> List[str]:
         """Format the transition between exception stacks."""
         lines = []
-        lines.append("")
+        lines.append('')
         lines.append(Styles.Error(STACK_SEPARATOR * term_width))
-        lines.append("")
+        lines.append('')
 
         if stack.is_cause:
-            lines.append(Styles.ErrorBold("The above exception was the direct cause of the following exception:"))
+            lines.append(
+                Styles.ErrorBold(
+                    'The above exception was the direct cause of the following exception:'
+                )
+            )
         elif stack.is_context:
-            lines.append(Styles.ErrorBold("During handling of the above exception, another exception occurred:"))
+            lines.append(
+                Styles.ErrorBold(
+                    'During handling of the above exception, another exception occurred:'
+                )
+            )
 
-        lines.append("")
+        lines.append('')
         return lines
 
     def _render_traceback(self) -> Iterable[str]:
@@ -852,11 +937,10 @@ class PrettyTraceback:
             Formatted lines for the complete traceback display
         """
         term_width = self.terminal_width
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        # Display header with timestamp
-        yield Styles.Muted(f"Traceback captured at {timestamp}")
-        yield ""
+        yield self._format_header(term_width, timestamp)
+        yield ''
 
         # Process each exception stack in the trace
         for i, stack in enumerate(self.trace.stacks):
@@ -875,14 +959,14 @@ class PrettyTraceback:
 
             # Add a blank line before frames if there are any
             if stack.frames:
-                yield ""
+                yield ''
 
             # Let the user know when max_frames dropped part of the stack.
             if stack.omitted_frames:
-                yield ""
+                yield ''
                 yield Styles.Muted(
-                    f"  ... {stack.omitted_frames} earlier frame(s) omitted "
-                    f"(max_frames={self.max_frames})"
+                    f'  ... {stack.omitted_frames} earlier frame(s) omitted '
+                    f'(max_frames={self.max_frames})'
                 )
 
             # Process each frame in the stack (in reverse order - most recent first)
@@ -898,17 +982,17 @@ class PrettyTraceback:
                 if self.show_locals and frame_info.locals:
                     locals_lines = self._format_locals(frame_info.locals)
                     if locals_lines:
-                        yield ""
-                        yield f"  {Styles.LocalsHeader('Variables:')}"
+                        yield ''
+                        yield f'  {Styles.LocalsHeader("Variables:")}'
                         yield from locals_lines
 
                 # Add a separator between frames (except after the last frame)
                 if frame_index < len(stack.frames) - 1:
-                    yield ""
+                    yield ''
                     # Use a horizontal line as a separator
-                    separator = Styles.Muted("  " + "─" * (term_width - 4))
+                    separator = Styles.Muted('  ' + '─' * (term_width - 4))
                     yield separator
-                    yield ""
+                    yield ''
 
     # --- Output Methods ---
     def print(self, file: Any = None) -> None:
@@ -929,11 +1013,19 @@ class PrettyTraceback:
                 print(line, file=file)
         except Exception as e:
             # If our formatter fails, fall back to the original traceback
-            print("\n" + Styles.ERROR_STYLE + "--- ERROR IN PRETTY TRACEBACK ---" + Styles.RESET, file=sys.stderr)
-            print(f"Formatter failed: {e}", file=sys.stderr)
-            print("--- ORIGINAL TRACEBACK ---", file=sys.stderr)
-            traceback.print_exception(self.exc_type, self.exc_value, self.tb, file=sys.stderr)
-    
+            print(
+                '\n'
+                + Styles.ERROR_STYLE
+                + '--- ERROR IN PRETTY TRACEBACK ---'
+                + Styles.RESET,
+                file=sys.stderr,
+            )
+            print(f'Formatter failed: {e}', file=sys.stderr)
+            print('--- ORIGINAL TRACEBACK ---', file=sys.stderr)
+            traceback.print_exception(
+                self.exc_type, self.exc_value, self.tb, file=sys.stderr
+            )
+
     @classmethod
     def from_exception(
         cls,
@@ -941,21 +1033,21 @@ class PrettyTraceback:
         exc_value: BaseException,
         traceback_obj: Optional[TracebackType],
         **kwargs,
-    ) -> "PrettyTraceback":
+    ) -> 'PrettyTraceback':
         """Create a PrettyTraceback from exception info.
-        
+
         This is a convenience classmethod for creating a PrettyTraceback
         from exception information, similar to sys.exc_info().
-        
+
         Args:
             exc_type: The exception type.
             exc_value: The exception value.
             traceback_obj: The traceback object.
             **kwargs: Additional arguments for PrettyTraceback.
-            
+
         Returns:
             A new PrettyTraceback instance.
-            
+
         Example:
             >>> try:
             ...     raise ValueError("example")
@@ -964,41 +1056,43 @@ class PrettyTraceback:
             ...     tb.print()
         """
         return cls(exc_type, exc_value, traceback_obj, **kwargs)
-    
+
     def is_suppressed(self, path: str) -> bool:
         """Check if a path should be suppressed from the traceback.
-        
+
         Args:
             path: The file path to check.
-            
+
         Returns:
             True if the path should be suppressed.
         """
         if not self.suppress:
             return False
-        
+
         path_lower = path.lower()
         for suppress_path in self.suppress:
             if suppress_path.lower() in path_lower:
                 return True
         return False
-    
+
     def __str__(self) -> str:
         """Return rendered traceback as string."""
-        return "\n".join(self._render_traceback())
-    
+        return '\n'.join(self._render_traceback())
+
     def __repr__(self) -> str:
         """Return traceback representation."""
-        exc_name = getattr(self.exc_type, "__name__", str(self.exc_type))
-        return f"PrettyTraceback({exc_name}, show_locals={self.show_locals})"
-
+        exc_name = getattr(self.exc_type, '__name__', str(self.exc_type))
+        return f'PrettyTraceback({exc_name}, show_locals={self.show_locals})'
 
 
 # --- Installation Function ---
 _original_excepthook: Optional[Callable] = None
 _current_hook_options: Dict[str, Any] = {}
 
-def pretty_excepthook(exc_type: Type[BaseException], exc_value: BaseException, tb: Optional[TracebackType]) -> None:
+
+def pretty_excepthook(
+    exc_type: Type[BaseException], exc_value: BaseException, tb: Optional[TracebackType]
+) -> None:
     """Custom exception hook that displays a pretty traceback.
 
     This function is installed as sys.excepthook by the install() function.
@@ -1010,12 +1104,14 @@ def pretty_excepthook(exc_type: Type[BaseException], exc_value: BaseException, t
         tb: The traceback object
     """
     global _current_hook_options
-    PrettyTraceback(exc_type, exc_value, tb, **_current_hook_options).print(file=sys.stderr)
+    PrettyTraceback(exc_type, exc_value, tb, **_current_hook_options).print(
+        file=sys.stderr
+    )
+
 
 def install(
     *,
     extra_lines: int = DEFAULT_EXTRA_LINES,
-    theme: Any = DEFAULT_THEME,
     show_locals: bool = False,
     locals_max_string: int = MAX_VARIABLE_LENGTH,
     locals_max_depth: int = LOCALS_MAX_DEPTH,
@@ -1032,11 +1128,6 @@ def install(
 
     Args:
         extra_lines: Number of extra lines to show around the error line
-        theme: The syntax highlighting theme. Either a litprinter theme name
-            (e.g. "cyberpunk", "dracula"), a Pygments built-in name (e.g.
-            "monokai", "friendly"), or any ``pygments.style.Style`` subclass.
-            Anything else is reported on stderr and falls back to
-            ``DEFAULT_THEME``.
         show_locals: Whether to show local variables in the traceback
         locals_max_string: Maximum length for string variables
         locals_max_depth: Maximum depth for nested structures
@@ -1056,72 +1147,34 @@ def install(
         # Basic usage
         install()
 
-        # With local variables and custom theme
-        install(show_locals=True, theme="dracula")
+        # With local variables and a shorter snippet
+        install(show_locals=True, extra_lines=3)
         ```
     """
     global _original_excepthook, _current_hook_options
     previous_hook = sys.excepthook
 
-    # --- Determine Pygments Style CLASS ---
-    actual_theme_name = theme
-
-    if isinstance(theme, str):
-        # A built-in litprinter theme, e.g. "cyberpunk".
-        selected_style_cls = CUSTOM_STYLES.get(theme.lower())
-    elif isinstance(theme, type) and issubclass(theme, PygmentsStyle):
-        # Already a Pygments Style class: use it as-is.
-        selected_style_cls = theme
-        actual_theme_name = theme.__name__
-    else:
-        warning = (
-            f"WARNING: Theme must be a string or Style class, got "
-            f"{type(theme)}. Using '{DEFAULT_THEME}' instead."
-        )
-        print(Styles.WARNING_STYLE + warning + Styles.RESET, file=sys.stderr)
-        theme = DEFAULT_THEME
-        actual_theme_name = DEFAULT_THEME
-        selected_style_cls = CUSTOM_STYLES.get(DEFAULT_THEME.lower())
-
-    if selected_style_cls is None and isinstance(theme, str):
-        # Fall back to the Pygments built-in styles.
-        try:
-            selected_style_cls = get_style_by_name(theme)
-        except ClassNotFound:
-            warning = (
-                f"WARNING: Theme '{theme}' not found. "
-                f"Using '{DEFAULT_THEME}' instead."
-            )
-            print(Styles.WARNING_STYLE + warning + Styles.RESET, file=sys.stderr)
-            actual_theme_name = DEFAULT_THEME
-            selected_style_cls = (
-                CUSTOM_STYLES.get(DEFAULT_THEME.lower())
-                or get_style_by_name('default')
-            )
-
+    # Store the configuration options for the traceback handler
     # Store the configuration options for the traceback handler
     _current_hook_options = {
-        "extra_lines": extra_lines,
-        "theme": actual_theme_name,
-        "show_locals": show_locals,
-        "locals_max_string": locals_max_string,
-        "locals_max_depth": locals_max_depth,
-        "locals_hide_dunder": locals_hide_dunder,
-        "locals_hide_sunder": locals_hide_sunder,
-        "suppress": suppress,
-        "max_frames": max_frames,
-        "width": width,
-        "_selected_pygments_style_cls": selected_style_cls  # Pass the determined CLASS
+        'extra_lines': extra_lines,
+        'show_locals': show_locals,
+        'locals_max_string': locals_max_string,
+        'locals_max_depth': locals_max_depth,
+        'locals_hide_dunder': locals_hide_dunder,
+        'locals_hide_sunder': locals_hide_sunder,
+        'suppress': suppress,
+        'max_frames': max_frames,
+        'width': width,
     }
 
-    # Install the hook if it's not already installed
+    # Install the hook if it is not already installed, and always report the
+    # hook that was in place before this call (the documented return value).
     if previous_hook is not pretty_excepthook:
-         _original_excepthook = previous_hook
-         sys.excepthook = pretty_excepthook
-         return _original_excepthook
-    else:
-        # If already installed, just update the options and return the current hook
-        return pretty_excepthook
+        _original_excepthook = previous_hook
+        sys.excepthook = pretty_excepthook
+    return previous_hook
+
 
 def uninstall() -> None:
     """Uninstall the pretty traceback handler and restore the original exception hook.
@@ -1153,8 +1206,9 @@ def uninstall() -> None:
         _original_excepthook = None
         _current_hook_options = {}
 
-        print(Styles.Muted("LitPrinter traceback handler uninstalled."), file=sys.stderr)
-
+        print(
+            Styles.Muted('LitPrinter traceback handler uninstalled.'), file=sys.stderr
+        )
 
 
 # Backwards-compatible alias

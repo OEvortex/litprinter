@@ -45,7 +45,7 @@ ic.info("server started")  # INFO  server started
 ```
 
 That's it. After `pip install litprinter`, `ic` is available in **every** Python
-script — no import required.
+script — no import required — and so are the pretty tracebacks.
 
 > Editors: this repo ships a patched typeshed (`.typeshed`) so `ic` is typed as
 > a real builtin for ty, Pylance/pyright and mypy, with hover docs and
@@ -85,6 +85,27 @@ ic(x, includeContext=False)  # suppress context for this call
 
 ic.configureOutput(contextMode="always")  # 'auto' (default) | 'always' | 'never'
 ```
+
+### 🎨 Rich-like rendering
+
+Values are syntax highlighted automatically and multi-line values hang off
+the first line instead of restarting at column 0:
+
+```python
+config = {"host": "0.0.0.0", "port": 8080, "tags": ["a", "b"]}
+ic(config)
+```
+
+```
+ic| config: {
+        'host': '0.0.0.0',
+        'port': 8080,
+        'tags': ['a', 'b']
+      }
+```
+
+Colors follow the terminal: on for a TTY, off when piped to a file. Force them
+with `FORCE_COLOR=1`, suppress with `NO_COLOR=1`.
 
 ## 🖨️ `ic.print` — drop-in `print()` replacement
 
@@ -141,40 +162,61 @@ Output goes to stderr so it stays out of your piped stdout.
 result = ic(calculate(x))  # prints AND returns the value
 ```
 
-## 🎨 Themes
+## 🎨 One theme
+
+LitPrinter ships a single, hand-tuned theme (`LitPrinterStyle`). It is applied
+automatically to `ic()` values, `ic.print(..., highlight=True)` and tracebacks —
+there is nothing to choose and nothing to configure.
+
+The palette is deliberately quiet so long debugging sessions stay readable:
+muted blue-gray for punctuation, calm cyan for names, warm green for strings,
+soft orange for numbers, and strong red reserved for actual errors.
 
 ```python
-from litprinter import ic, set_style, LitStyle, CyberpunkStyle, MonokaiStyle
-
-ic(x)
-set_style(LitStyle)       # vibrant and modern
-ic(x)
-set_style(CyberpunkStyle) # neon
-set_style(MonokaiStyle)   # classic code editor
+from litprinter import LitPrinterStyle   # the only style, exposed for reference
 ```
 
-Available: `TokyoNight` (default), `SolarizedDark`, `LitStyle`,
-`CyberpunkStyle`, `MonokaiStyle`.
+## 💥 Beautiful tracebacks — installed automatically
 
-## 💥 Beautiful tracebacks
+Installing litprinter also installs the traceback handler, so **every** Python
+process gets readable tracebacks with no setup:
+
+```
+── Traceback (most recent call last) ────────── 2026-10-02 11:00:00 ──────────
+
+ZeroDivisionError: division by zero
+
+  File "app.py", line 12, in divide
+     10 │     payload = {"a": a, "b": b}
+  ❱   12 │     return a / b
+
+  Variables:
+  a = 10    payload = {'a': 10, 'b': 0}  [dict]
+  b = 0
+```
+
+Tune it at runtime:
 
 ```python
 from litprinter import traceback
 
 traceback.install(
-    theme="cyberpunk",
     show_locals=True,
     extra_lines=3,
-    suppress=["site-packages"],
-    max_frames=20,
+    suppress=["site-packages"],  # hide library frames
+    max_frames=20,               # cap the stack
+    locals_hide_sunder=True,     # hide _private locals
 )
+
+traceback.uninstall()  # back to the default handler
 ```
 
-Hide library frames with `suppress=[...]`, cap the stack with `max_frames`, and
-restore the default handler with `traceback.uninstall()`.
+Opt out before Python starts:
 
-Shows syntax-highlighted source, local variables, and a clean layout for
-uncaught exceptions.
+```bash
+LITPRINTER_NO_TRACEBACK=1 py app.py   # normal traceback, ic() still available
+LITPRINTER_NO_AUTOLOAD=1 py app.py    # litprinter fully inert
+```
 
 ## 🔧 Configuration
 
@@ -248,13 +290,14 @@ ic.info("connected", url)
 | `ic.disable()` / `ic.enable()` | Toggle debug output |
 | `ic.format(*args)` | Format without printing |
 | `ic.install()` / `ic.uninstall()` | (Un)register the builtins |
+| `LitPrinterStyle` | The single built-in theme (a `pygments.style.Style`) |
 | `set_style(style)` / `get_style()` | Theme control |
 | `argumentToString.register(Type)` | Custom value formatters |
 | `traceback.install(...)` | Pretty tracebacks |
 
 Aliases: `LIT`, `litprint`, `lit` all point at `ic`.
 
-## 🗑️ Removed in 0.4.0
+## 🗑️ Removed
 
 The bundled Rich re-implementation was removed so the package stays small and
 focused on printing/debugging:
@@ -264,8 +307,8 @@ focused on printing/debugging:
 real [Rich](https://github.com/Textualize/rich) if you need full-blown console
 rendering or panels.
 
-`litprinter.styles` is **still shipped** — it holds the 19 syntax-highlighting
-themes used by `traceback.install(theme=...)`.
+The 19 bundled themes and `set_style()` / `traceback.install(theme=)` were
+removed in 0.5.0: there is now a single built-in theme.
 
 ## 🤝 Contributing
 

@@ -1,20 +1,43 @@
-"""Autoload helper for LitPrinter's .pth file.
+"""Startup hook for LitPrinter.
 
-The companion ``litprinter_autoload.pth`` is processed by ``site.py`` and
-executes ``import litprinter_autoload``.  This module intentionally swallows
-import failures so a broken environment never breaks every Python startup.
+A ``litprinter_autoload.pth`` file is installed next to this module, so
+CPython's ``site`` executes ``import litprinter_autoload`` for **every**
+interpreter start. That is what makes ``ic()`` available everywhere with no
+import, and what installs the pretty traceback handler.
+
+Everything here is best-effort and must never break a Python process: any
+failure is swallowed.
+
+Environment variables
+---------------------
+``LITPRINTER_NO_AUTOLOAD=1``
+    Skip everything. ``ic()`` is not added to builtins and the default
+    traceback handler is left alone.
+``LITPRINTER_NO_TRACEBACK=1``
+    Still register ``ic()``, but leave ``sys.excepthook`` untouched.
 """
-
-from __future__ import annotations
 
 import os
 
-_DISABLE_ENV = "LITPRINTER_NO_AUTOLOAD"
 
-if os.environ.get(_DISABLE_ENV, "").lower() not in {"1", "true", "yes", "on"}:
+def _disabled(name: str) -> bool:
+    """True when the named environment variable opts out.
+
+    Any non-empty value counts, so ``LITPRINTER_NO_TRACEBACK=1`` and
+    ``LITPRINTER_NO_TRACEBACK=please`` both work.
+    """
+    return bool(os.environ.get(name, '').strip())
+
+
+if not _disabled('LITPRINTER_NO_AUTOLOAD'):
     try:
-        import litprinter  # noqa: F401
+        import litprinter  # noqa: F401  (registers ic in builtins)
     except Exception:
-        # Never let autoload break Python startup.  Explicit imports of
-        # litprinter will still surface the original exception.
+        # A broken install must never stop Python from starting.
         pass
+    else:
+        if not _disabled('LITPRINTER_NO_TRACEBACK'):
+            try:
+                litprinter.traceback.install(show_locals=True)
+            except Exception:
+                pass

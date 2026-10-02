@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-10-02
+
+LitPrinter now owns the whole terminal output story: debug printing, `print()`,
+logging, syntax highlighting and tracebacks, all in one consistent look.
+
+### Added
+
+- **Automatic traceback installation.** Installing litprinter now also installs
+  the pretty traceback hook for every Python process, so readable tracebacks
+  work with no setup. Opt out with `LITPRINTER_NO_TRACEBACK=1`, or disable
+  litprinter entirely with `LITPRINTER_NO_AUTOLOAD=1`.
+- **Rich-like rendering** (`render.py`): the prefix and file/line context are
+  dimmed, variable names get their own colour, values are syntax highlighted
+  automatically, and multi-line values hang off the first line instead of
+  restarting at column 0.
+- `LitPrinterStyle`, a single hand-tuned theme tuned for long debugging
+  sessions, shared by `ic()`, `ic.print(..., highlight=True)` and tracebacks.
+
+### Fixed
+
+- `colorama.init()` was being called on every platform, which wraps
+  `sys.stdout`/`sys.stderr` and **strips ANSI codes whenever output is piped**.
+  All highlighting was silently lost when redirecting to a file. It is now only
+  used on Windows.
+- `ic()` and `ic.print()` now share one color-detection path, so `NO_COLOR`,
+  `FORCE_COLOR` and `TERM=dumb` behave identically for both.
+- `traceback.install()` documented that it returns the previous hook but
+  returned a different function depending on the branch taken.
+
+### Changed
+
+- Traceback layout: Rich-style `── Traceback (most recent call last) ──` header
+  with a timestamp, a thinner separator rule, and library frames dimmed and
+  tagged `[library]` so your own frames stand out.
+- Colors are decided from the destination stream, so `ic()` output keeps its
+  highlighting when piped.
+
+### Removed
+
+- The 19 bundled themes (`litprinter.styles`, ~1900 lines) and the 5 styles in
+  `coloring.py`. There is now exactly one theme.
+- `set_style()` / `get_style()` and `traceback.install(theme=...)`. Use
+  `litprinter.LitPrinterStyle` if you need to reference the style.
+- `coloring.py` (replaced by `theme.py`).
+
 ## [0.4.0] - 2026-10-02
 
 LitPrinter is now one focused tool: a debug printer, a `print()` replacement, a

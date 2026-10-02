@@ -17,7 +17,7 @@ uv run ty check .
 
 Key patterns:
 - Use `functools.singledispatch` for `argumentToString` in `core.py` to register type-specific formatters
-- Pygments styles inherit from `pygments.style.Style` in `styles/base.py`
+- The single theme `theme.py` subclasses `pygments.style.Style`
 - Use `_` prefix for private module-level functions (e.g., `_colorize`, `_create_formatter`)
 
 ## Architecture
@@ -29,10 +29,15 @@ Key patterns:
   syntax highlighting
 - **`markup.py`**: inline `[bold red]...[/]` markup → ANSI, used by `ic.print()`
 - **`builtins.py`**: `install()` / `uninstall()` for the builtins registration
-- **`colors.py`**: the ANSI escape sequences used by markup and tracebacks
-- **`coloring.py`**: Pygments styles for `ic()` output (`set_style()`)
-- **`styles/`**: the 19 Pygments themes used by `traceback.install(theme=...)`
-- **`traceback.py`**: pretty tracebacks (`install()` / `uninstall()`)
+- **`render.py`**: turns a debug record into a styled line — dimmed
+  prefix/context, coloured names, auto-aligned multi-line values
+- **`colors.py`**: the ANSI escape sequences used by markup, render and
+  tracebacks
+- **`theme.py`**: `LitPrinterStyle`, the one and only Pygments theme
+- **`traceback.py`**: pretty tracebacks (`install()` / `uninstall()`), installed
+  automatically by `litprinter_autoload.py`
+- **`../litprinter_autoload.py`**: executed by the `.pth` at interpreter
+  startup; registers `ic` and installs the traceback hook
 - **`py.typed`**: PEP 561 marker; `.typeshed/` also declares `ic` as a builtin
   so editors show it like `print()`
 
@@ -68,7 +73,7 @@ Package is in `src/litprinter/` (see `package-dir` in pyproject.toml).
 - **Auto-install to builtins**: `ic` is added to Python builtins in `__init__.py` for zero-import usage
 - **Return passthrough**: `ic(x)` returns the value(s) passed to it for inline usage: `result = ic(calculate(x))`
 - **Singledispatch formatters**: Register custom formatters using `@argumentToString.register(MyType)`
-- **Themes**: Pygments styles in `styles/*.py` inherit from `pygments.style.Style`
+- **Theme**: one theme only (`LitPrinterStyle` in `theme.py`); there is no `set_style()`
 
 ## Integration Points
 
