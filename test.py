@@ -90,14 +90,15 @@ ic.print('[not markup]', markup=False)
 
 
 # ---------------------------------------------------------------------------
-# Logging without importing logging
+# Logging without importing logging: ic() is the logger, level= adds severity
 # ---------------------------------------------------------------------------
-ic.debug('cache miss', 'user:42')
-ic.info('server listening on :8080')
-ic.success('build finished')
-ic.warning('retrying in 5s', 'attempt=2')
-ic.error('request failed', 'status=500')
-ic.log('explicit level', level='info', timestamp=True)
+ic('cache miss', user='alice', level='debug')
+ic('server listening on :8080', level='info')
+ic('build finished', level='success')
+ic('retrying in 5s', attempt=2, level='warning')
+ic('request failed', status=500, level='error')
+ic('disk almost full', level='critical')
+print(ic.format('dry run, not printed', level='info'))
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +108,7 @@ def safe_divide(a, b):
     try:
         return divide(a, b)
     except ValueError as exc:
-        ic.error('caught', exc)
+        ic('caught', exc, level='error')
         return None
 
 

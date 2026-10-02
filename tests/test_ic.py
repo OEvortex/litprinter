@@ -5,15 +5,6 @@ import pytest
 from litprinter import IceCreamDebugger, ic
 
 
-@pytest.fixture
-def out():
-    """Capture ic output through a custom outputFunction."""
-    lines = []
-    ic.configureOutput(outputFunction=lines.append)
-    yield lines
-    ic.configureOutput(outputFunction=None, prefix='ic| ')
-
-
 def test_simple_name_has_no_context(out):
     x = 42
     ic(x)

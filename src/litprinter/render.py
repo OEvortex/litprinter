@@ -62,6 +62,7 @@ def render_record(
     color: bool = True,
     highlight: Optional[Callable[[str], str]] = None,
     delimiter: str = ', ',
+    context_arrow: bool = True,
 ) -> str:
     """Render one ``ic()`` line.
 
@@ -74,6 +75,8 @@ def render_record(
         highlight: Callable that syntax highlights a value string. Defaults to
             :func:`litprinter.core._colorize`.
         delimiter: Separator placed between the rendered pairs.
+        context_arrow: Whether the context is followed by ``>>>``. Leveled
+            output reads as a log line and drops the arrow.
 
     Returns:
         The rendered line, spanning multiple lines when a value is multi-line.
@@ -89,7 +92,8 @@ def render_record(
     head = _paint(prefix, dim, color)
     if context:
         head += _paint(f'[{context}] ', dim, color)
-        head += _paint('>>> ', dim, color)
+        if context_arrow:
+            head += _paint('>>> ', dim, color)
 
     chunks: List[str] = []
     for expr, value in pairs:

@@ -1,4 +1,4 @@
-"""Tests for ic.print, ic.log and markup rendering."""
+"""Tests for ic.print, ic(..., level=) and markup rendering."""
 
 import io
 
@@ -92,39 +92,179 @@ def test_strip_markup():
     assert strip_markup('[weird]x') == '[weird]x'
 
 
-def test_log_levels():
-    buf = io.StringIO()
-    ic.info('hello', file=buf)
-    assert 'INFO' in buf.getvalue()
-    assert 'hello' in buf.getvalue()
+def test_level_tags_the_line(out):
+    ic('hello', level='info')
+    assert out[-1].startswith('INFO')
+    assert "'hello'" in out[-1]
 
 
-def test_log_color():
-    buf = io.StringIO()
-    ic.error('bad', file=buf, color=True)
-    assert '\033[31m' in buf.getvalue()
+@pytest.mark.parametrize(
+    ('level', 'tag'),
+    [
+        ('debug', 'DEBUG'),
+        ('info', 'INFO'),
+        ('success', 'OK'),
+        ('ok', 'OK'),
+        ('warning', 'WARN'),
+        ('warn', 'WARN'),
+        ('error', 'ERROR'),
+        ('critical', 'CRIT'),
+    ],
+)
+def test_every_level_renders_its_tag(level, tag, out):
+    ic('msg', level=level)
+    assert out[-1].split()[0] == tag
 
 
-def test_log_timestamp():
-    buf = io.StringIO()
-    ic.log('x', level='info', file=buf, timestamp=True)
-    assert len(buf.getvalue().split(' ')[0]) == 8  # HH:MM:SS
+def test_level_replaces_the_ic_prefix(out):
+    ic('msg')
+    assert out[-1].startswith('ic| ')
+    ic('msg', level='error')
+    assert not out[-1].startswith('ic| ')
 
 
-def test_log_sep():
-    buf = io.StringIO()
-    ic.info('a', 'b', file=buf, sep='-')
-    assert 'a-b' in buf.getvalue()
+def test_level_drops_the_context_arrow(out):
+    items = [1, 2, 3]
+    ic(items[0], level='warning')
+    assert '>>>' not in out[-1]
+    ic(items[0])
+    assert '>>>' in out[-1]
 
 
-def test_log_unknown_level():
-    with pytest.raises(ValueError):
-        ic.log('x', level='nope', file=io.StringIO())
+def test_level_shows_context_when_needed(out):
+    ic(len([1, 2, 3]), level='error')
+    assert '[test_print_log.py' in out[-1]
 
 
-def test_log_shortcuts_exist():
-    for name in ('debug', 'info', 'success', 'warning', 'warn', 'error', 'critical'):
-        assert callable(getattr(ic, name))
+def test_level_is_colored_when_enabled():
+    from litprinter.core import render_level_prefix
+
+    colored = render_level_prefix('error', color=True)
+    assert '\033[31m' in colored
+    assert render_level_prefix('error', color=False) == 'ERROR  '
+    assert 'ERROR' in ic.format('boom', level='error')
+
+
+def test_level_without_args_is_a_breadcrumb(out):
+    ic(level='info')
+    assert out[-1].startswith('INFO')
+
+
+def test_fields_are_named_pairs(out):
+    ic('cache miss', key='session:9f2', level='debug')
+    assert out[-1].endswith("'cache miss', key: 'session:9f2'")
+
+
+def test_fields_work_without_a_level(out):
+    ic('cache miss', key='session:9f2')
+    assert out[-1] == "ic| 'cache miss', key: 'session:9f2'"
+
+
+def test_fields_only_no_positional(out):
+    ic(attempt=2, level='info')
+    assert out[-1].endswith('attempt: 2')
+
+
+def test_fields_follow_positional_pairs(out):
+    x = 1
+    ic(x, extra='v')
+    assert out[-1] == "ic| x: 1, extra: 'v'"
+
+
+def test_fields_use_the_custom_formatter(out):
+    from litprinter import argumentToString
+
+    class Thing:
+        pass
+
+    before = argumentToString.dispatch(Thing)
+    argumentToString.register(Thing, lambda self: '<thing>')
+    try:
+        ic('obj', t=Thing())
+        assert 't: <thing>' in out[-1]
+    finally:
+        argumentToString.register(Thing, before)
+
+
+def test_fields_respect_the_pair_delimiter(out):
+    ic.configureOutput(pairDelimiter=' | ')
+    try:
+        ic('msg', a=1, b=2)
+        assert out[-1] == "ic| 'msg' | a: 1 | b: 2"
+    finally:
+        ic.configureOutput(pairDelimiter=', ')
+
+
+def test_reserved_keywords_are_not_fields(out):
+    x = 1
+    ic(x, includeContext=True, contextAbsPath=False, level='info')
+    line = out[-1]
+    assert 'includeContext' not in line
+    assert 'contextAbsPath' not in line
+    assert line.startswith('INFO')
+
+
+def test_fields_are_auto_aligned(out):
+    ic('cfg', host='0.0.0.0', port=8080, level='info')
+    assert '\n' not in out[-1] or all(
+        line.startswith(' ') for line in out[-1].split('\n')[1:]
+    )
+
+
+def test_fields_do_not_change_the_return_value(out):
+    """Fields are context, not the value: ic(calc(), step=i) still returns calc()."""
+    x = 5
+    assert ic(x, tag='t') == 5
+    assert ic(x, y=2) == 5
+    assert ic(x, 2, y=3) == (x, 2)
+    assert ic(tag='t') is None
+
+
+def test_format_accepts_fields():
+    assert ic.format('msg', a=1, level='error').endswith("'msg', a: 1")
+
+
+def test_level_unknown_raises(out):
+    with pytest.raises(ValueError, match='Unknown level'):
+        ic('x', level='nope')
+    # A bad level must not corrupt the debugger's state.
+    ic('still works')
+
+
+def test_level_respects_disable(out):
+    ic.disable()
+    try:
+        ic('hidden', level='error')
+        assert out == []
+    finally:
+        ic.enable()
+
+
+def test_level_passes_values_through(out):
+    assert ic(7, level='debug') == 7
+    assert ic(1, 2, level='info') == (1, 2)
+    assert ic(level='info') is None
+
+
+def test_format_honors_level():
+    assert ic.format('x', level='error').startswith('ERROR')
+
+
+def test_level_methods_are_gone():
+    for name in (
+        'log',
+        'debug',
+        'info',
+        'success',
+        'warning',
+        'warn',
+        'error',
+        'critical',
+    ):
+        assert not hasattr(ic, name), name
+    import litprinter
+
+    assert not hasattr(litprinter, 'log')
 
 
 def test_module_level_print_alias():

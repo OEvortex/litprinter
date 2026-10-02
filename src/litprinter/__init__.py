@@ -4,17 +4,17 @@ LitPrinter - The Debug Printer That Replaces print(), logging and icecream
 
 A single, opinionated tool for terminal output:
 
-- ``ic(...)``        - debug print with automatic source expressions
-- ``ic.print(...)``  - drop-in replacement for ``print()`` with markup
-- ``ic.info(...)``   - logging without importing ``logging``
-- ``traceback``      - syntax highlighted tracebacks
+- ``ic(...)``          - debug print with automatic source expressions, and
+                          the single entry point for logging via ``level=``
+- ``ic.print(...)``    - drop-in replacement for ``print()`` with markup
+- ``traceback``        - syntax highlighted tracebacks, installed for you
 
 Everything is available as a builtin after ``pip install litprinter``:
 
     x = 42
-    ic(x)                                  # ic| x: 42
-    ic.print("[bold green]done[/]")         # done
-    ic.info("server ready")                 # INFO  server ready
+    ic(x)                                   # ic| x: 42
+    ic.print("[bold green]done[/]")          # done
+    ic("server ready", level="info")        # INFO  [app.py:12] 'server ready'
 
 Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
@@ -25,12 +25,11 @@ License: MIT
 # ============================================================================
 
 from .litprint import (
-    ic,  # Main debug printer
+    ic,  # Main debug printer (also the logging entry point)
     LIT,  # Alias
     litprint,  # Alias
     lit,  # Alias
     print,  # Drop-in replacement for builtin print()
-    log,  # Logging-style output
     configureOutput,
     enable,
     disable,
@@ -86,7 +85,7 @@ for _name, _value in (
 # Version
 # ============================================================================
 
-__version__ = '0.5.0'
+__version__ = '0.6.0'
 
 
 # ============================================================================
@@ -101,7 +100,6 @@ __all__ = [
     'lit',
     # Printing
     'print',
-    'log',
     # Configuration
     'configureOutput',
     'enable',

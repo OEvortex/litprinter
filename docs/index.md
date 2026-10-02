@@ -17,7 +17,7 @@ pip install litprinter
 x = 42
 ic(x)                      # ic| x: 42
 ic.print("value:", x)      # value: 42
-ic.info("service ready")   # INFO  service ready
+ic("service ready", level="info")   # INFO  service ready
 ```
 
 `ic` is registered in `builtins` automatically, so it works in every script.
@@ -113,20 +113,40 @@ Markup tags: `bold`, `dim`, `italic`, `underline`, `strike`, `reverse`,
 
 ## Logging
 
-```python
-ic.debug("cache miss", key)
-ic.info("connected", url)
-ic.success("migration done")
-ic.warning("retrying", attempt=2)
-ic.error("request failed", status=500)
-ic.critical("disk full")
+`ic()` is the only entry point. Pass `level=` to tag a line with a severity:
 
-ic.log("generic", level="info")
-ic.log("timestamped", level="warn", timestamp=True)
+```python
+ic("cache miss", key="session:9f2", level="debug")
+ic("connected", url=url, level="info")
+ic("migration done", level="success")
+ic("retrying", attempt=2, level="warning")
+ic("request failed", status=500, level="error")
+ic("disk full", level="critical")
+
+ic("cache miss", key="session:9f2")   # fields work without a level
+ic.format("dry run", level="error")   # returns the line without printing
 ```
 
-Levels: `debug`, `info`, `success`, `warning`/`warn`, `error`, `critical`.
-Level output goes to stderr so piped stdout stays clean.
+```
+DEBUG  'cache miss', key: 'session:9f2'
+OK     'migration done'
+WARN   [worker.py:88 in retry()] 'retrying', attempt: 2
+ERROR  'request failed', status: 500
+```
+
+Levels: `debug`, `info`, `success` (`ok`), `warning` (`warn`), `error`,
+`critical`. An unknown level raises `ValueError`.
+
+A leveled line replaces the `ic| ` prefix with the severity tag and drops the
+`>>> ` context arrow. Everything else is unchanged — context still appears when
+the expression isn't self-describing, and `ic.disable()` silences levels too.
+Output goes to stderr so piped stdout stays clean.
+
+There are no `ic.log()` / `ic.error()` / ... methods; use `level=`.
+
+Keyword arguments other than `level`, `includeContext` and `contextAbsPath` are
+printed as named fields. Those three are reserved by the printer, so data can
+never collide with them.
 
 ## Configuration
 
@@ -227,8 +247,7 @@ uninstall()   # remove ic from builtins
 |-----|-------------|
 | `ic(*args, includeContext=None, contextAbsPath=None)` | Debug print, returns the values |
 | `ic.print(*values, sep, end, file, flush, markup, style, color, highlight)` | `print()` replacement |
-| `ic.log(*values, level, sep, file, flush, timestamp, markup)` | Logging output |
-| `ic.debug/info/success/warning/warn/error/critical` | Level shortcuts |
+| `ic(*values, level=...)` | Severity tag: debug/info/success/warning/error/critical |
 | `ic.configureOutput(prefix, outputFunction, argToStringFunction, includeContext, contextAbsPath, contextMode, pairDelimiter)` | Configure output |
 | `ic.enable()` / `ic.disable()` | Toggle debug output |
 | `ic.format(*args)` | Format without printing |
@@ -242,6 +261,9 @@ Aliases: `LIT`, `litprint`, `lit`.
 
 ## Removed
 
+- **0.6.0**: the level method family — `ic.log()`, `ic.debug()`, `ic.info()`,
+  `ic.success()`, `ic.warning()` / `ic.warn()`, `ic.error()`, `ic.critical()`
+  and module-level `litprinter.log()`. Use `ic(msg, level="error")`.
 - **0.5.0**: the 19 bundled themes and `litprinter.styles`, plus `set_style()`
   and `traceback.install(theme=...)`. One built-in theme remains.
 - **0.4.0**: the bundled Rich re-implementation — `Console`, `console`,
@@ -258,7 +280,7 @@ ic(user["name"])                  # after
 
 # logging -> ic
 logger.info("connected to %s", url)  # before
-ic.info("connected", url)            # after
+ic("connected", url, level="info")   # after
 
 # icecream -> litprinter
 from icecream import ic   # before
@@ -267,6 +289,6 @@ from icecream import ic   # before
 
 ## Version
 
-Current version: **0.5.0**
+Current version: **0.6.0**
 
 For more examples, see the [GitHub repository](https://github.com/OEvortex/litprinter).

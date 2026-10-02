@@ -4,9 +4,16 @@ import builtins
 
 import pytest
 
-from litprinter import DEFAULT_NAMES
+from litprinter import DEFAULT_NAMES, ic
 
-_PRINT_GLOBALS = ('print', 'log')
+
+@pytest.fixture
+def out():
+    """Capture ``ic()`` output through a custom outputFunction."""
+    lines = []
+    ic.configureOutput(outputFunction=lines.append)
+    yield lines
+    ic.configureOutput(outputFunction=None, prefix='ic| ')
 
 
 @pytest.fixture(autouse=True)
@@ -18,7 +25,7 @@ def restore_builtins():
     """
     saved = {
         name: getattr(builtins, name)
-        for name in (*DEFAULT_NAMES, *_PRINT_GLOBALS)
+        for name in DEFAULT_NAMES
         if hasattr(builtins, name)
     }
     yield

@@ -41,7 +41,7 @@ pip install litprinter
 x = 42
 ic(x)                      # ic| x: 42
 ic.print("hello", x)       # hello 42
-ic.info("server started")  # INFO  server started
+ic("server started", level="info")  # INFO  server started
 ```
 
 That's it. After `pip install litprinter`, `ic` is available in **every** Python
@@ -136,25 +136,55 @@ Supported tags: `bold`, `dim`, `italic`, `underline`, `strike`, `reverse`,
 
 ## 📋 Logging without `logging`
 
+`ic()` *is* the logger. Add `level=` and the line is tagged with a severity;
+keyword arguments become named fields:
+
 ```python
-ic.debug("cache miss", key)
-ic.info("connected", url)
-ic.success("migration complete")
-ic.warning("retrying in 5s", attempt=2)
-ic.error("request failed", status=500)
-ic.critical("disk full")
-
-# Or generic
-ic.log("custom level line", level="info")
-ic.log("with timestamp", level="warn", timestamp=True)
-
-# Or module-level
-from litprinter import log
-log("hello", level="info")
+ic("cache miss", key="session:9f2", level="debug")
+ic("connected", url=url, level="info")
+ic("migration complete", level="success")
+ic("retrying in 5s", attempt=2, level="warning")
+ic("request failed", status=500, level="error")
+ic("disk full", level="critical")
 ```
 
-Levels: `debug`, `info`, `success`, `warning`/`warn`, `error`, `critical`.
-Output goes to stderr so it stays out of your piped stdout.
+```
+DEBUG  'cache miss', key: 'session:9f2'
+INFO   'connected', url: 'https://api.internal'
+OK     'migration complete'
+WARN   'retrying in 5s', attempt: 2
+ERROR  'request failed', status: 500
+CRIT   'disk full'
+```
+
+Levels: `debug`, `info`, `success` (`ok`), `warning` (`warn`), `error`,
+`critical`. An unknown level raises `ValueError`.
+
+Two differences from `ic(x)`:
+
+- the `ic| ` prefix is replaced by the severity tag
+- the `>>> ` context arrow is dropped — a leveled line reads as a log record
+
+Everything else is identical: file/line context still appears when the
+expression isn't self-describing, multi-line values still hang off the first
+line, and `ic.disable()` silences levels too. Output goes to stderr so it stays
+out of your piped stdout.
+
+### Fields work without a level
+
+Keyword arguments are just named values, so this is fine too:
+
+```python
+ic("cache miss", key="session:9f2")
+# ic| 'cache miss', key: 'session:9f2'
+```
+
+Three keyword names belong to the printer and are never treated as fields:
+`level`, `includeContext` and `contextAbsPath`. Positional values are
+unaffected.
+
+`ic.format(msg, level="error")` returns the same line as a string without
+printing it.
 
 ## 🧵 Inline usage
 
@@ -275,23 +305,20 @@ From **`logging`**:
 # before
 logger.info("connected to %s", url)
 # after
-ic.info("connected", url)
+ic("connected", url, level="info")
 ```
 
 ## 📚 API Reference
 
 | API | Description |
 |-----|-------------|
-| `ic(*args)` | Debug print with source expressions and passthrough return |
+| `ic(*args, level=)` | Debug print, passthrough return, and the logger |
 | `ic.print(*values, sep=, end=, file=, flush=, markup=, style=, highlight=)` | `print()` replacement with markup |
-| `ic.log(*values, level=)` | Logging-style output |
-| `ic.debug/info/success/warning/error/critical(*values)` | Level shortcuts |
 | `ic.configureOutput(...)` | Configure prefix, context, formatters, output |
-| `ic.disable()` / `ic.enable()` | Toggle debug output |
-| `ic.format(*args)` | Format without printing |
+| `ic.disable()` / `ic.enable()` | Toggle output (including leveled lines) |
+| `ic.format(*args, level=)` | Format without printing |
 | `ic.install()` / `ic.uninstall()` | (Un)register the builtins |
 | `LitPrinterStyle` | The single built-in theme (a `pygments.style.Style`) |
-| `set_style(style)` / `get_style()` | Theme control |
 | `argumentToString.register(Type)` | Custom value formatters |
 | `traceback.install(...)` | Pretty tracebacks |
 
@@ -299,16 +326,17 @@ Aliases: `LIT`, `litprint`, `lit` all point at `ic`.
 
 ## 🗑️ Removed
 
-The bundled Rich re-implementation was removed so the package stays small and
-focused on printing/debugging:
-
-`Console`, `console`, `cprint`, `Panel`, `Box`, `Text`, `Span`, `Segment` and
-`Style`. `ic.print(markup=True)` covers the colored-output use case; use the
-real [Rich](https://github.com/Textualize/rich) if you need full-blown console
-rendering or panels.
-
-The 19 bundled themes and `set_style()` / `traceback.install(theme=)` were
-removed in 0.5.0: there is now a single built-in theme.
+- **0.6.0**: the level method family — `ic.log()`, `ic.debug()`, `ic.info()`,
+  `ic.success()`, `ic.warning()` / `ic.warn()`, `ic.error()`, `ic.critical()`
+  and the module-level `litprinter.log()`. Use `ic(msg, level="error")`.
+  One entry point, one way to turn it off.
+- **0.5.0**: the 19 bundled themes, `litprinter.styles`, `coloring.py`,
+  `set_style()` / `get_style()` and `traceback.install(theme=...)`. There is a
+  single built-in theme.
+- **0.4.0**: the bundled Rich re-implementation — `Console`, `console`,
+  `cprint`, `Panel`, `Box`, `Text`, `Span`, `Segment` and `Style`.
+  `ic.print(markup=True)` covers the colored-output use case; use the real
+  [Rich](https://github.com/Textualize/rich) for full console rendering.
 
 ## 🤝 Contributing
 

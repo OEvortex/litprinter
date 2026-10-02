@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-10-02
+
+`ic()` is now the only entry point for everything: debugging, printing, and
+logging. The level *methods* are gone; the same call with a keyword does it.
+
+### Added
+
+- `ic(*values, level=...)` tags a line with a severity: `debug`, `info`,
+  `success`/`ok`, `warning`/`warn`, `error`, `critical`. An unknown level raises
+  `ValueError` with the list of valid names, and the debugger's state is left
+  untouched when it does.
+- `ic.format(*values, level=...)` returns a leveled line without printing it.
+- Named fields: keyword arguments other than `level`, `includeContext` and
+  `contextAbsPath` are printed as `name: value` pairs, so logging reads the way
+  it is normally written — `ic("retrying", attempt=2, level="warning")`. Fields
+  use `argumentToString`, honour `pairDelimiter`, and never affect the return
+  value, so `result = ic(calculate(x), step=i)` still returns `calculate(x)`.
+
+### Changed
+
+- A leveled line replaces the `ic| ` prefix with the severity tag and drops the
+  `>>> ` context arrow, so it reads as a log record rather than an expression
+  dump. Context, multi-line alignment, color detection and `ic.disable()` all
+  behave exactly as they do for a plain `ic(x)`.
+
+### Removed
+
+- `ic.log()`, `ic.debug()`, `ic.info()`, `ic.success()`, `ic.warning()` /
+  `ic.warn()`, `ic.error()`, `ic.critical()` and the module-level
+  `litprinter.log()`. Use `ic(msg, level="error")`.
+
 ## [0.5.0] - 2026-10-02
 
 LitPrinter now owns the whole terminal output story: debug printing, `print()`,

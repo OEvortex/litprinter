@@ -79,6 +79,43 @@ _FSTRING_PREFIXES = (
     "RF'",
 )
 
+# Severity tags for ic(..., level=...). One entry point, no ic.log/ic.error.
+LOG_LEVELS = {
+    'debug': ('\033[90m', 'DEBUG'),
+    'info': ('\033[36m', 'INFO '),
+    'success': ('\033[32m', 'OK   '),
+    'ok': ('\033[32m', 'OK   '),
+    'warning': ('\033[33m', 'WARN '),
+    'warn': ('\033[33m', 'WARN '),
+    'error': ('\033[31m', 'ERROR'),
+    'critical': ('\033[1;31m', 'CRIT '),
+}
+
+
+def render_level_prefix(level: str, *, color: bool = True) -> str:
+    """Build the leading severity tag for a leveled ``ic()`` call.
+
+    Args:
+        level: One of debug, info, success/ok, warning/warn, error, critical.
+        color: Whether to emit ANSI colors.
+
+    Returns:
+        The padded tag, e.g. ``"ERROR  "`` (colored when enabled).
+
+    Raises:
+        ValueError: If ``level`` is not a known severity.
+    """
+    key = str(level).strip().lower()
+    try:
+        code, label = LOG_LEVELS[key]
+    except KeyError:
+        valid = ', '.join(sorted(LOG_LEVELS))
+        raise ValueError(f'Unknown level {level!r}; expected one of {valid}') from None
+    if color:
+        return f'{code}{label}\033[0m  '
+    return f'{label.strip()}  '
+
+
 # Default configuration
 DEFAULT_PREFIX = 'ic| '
 DEFAULT_ARG_TO_STRING_FUNCTION = pprint.pformat
@@ -529,42 +566,70 @@ class IceCreamDebugger:
         call_frame = current_frame.f_back if current_frame else None
         return self._format(call_frame, *args)
 
-    def _format(self, call_frame, *args) -> str:
+    def _format(
+        self,
+        call_frame,
+        *args,
+        prefix: Optional[str] = None,
+        context_arrow: bool = True,
+        fields: Optional[dict] = None,
+    ) -> str:
         """Internal formatting method.
 
         Args:
             call_frame: The calling frame.
             *args: Values to format.
+            prefix: Overrides the configured prefix (used for severity tags).
+            context_arrow: Whether to mark the context with ``>>>``. Leveled
+                output reads as a log line, so it omits the arrow.
+            fields: Named values appended as ``name: value`` pairs.
 
         Returns:
             Formatted string.
         """
-        prefix = self._get_prefix()
+        color = supports_color(sys.stderr)
+        head = self._get_prefix() if prefix is None else prefix
         arg_strs = self._extract_expressions(call_frame, args)
         context = self._resolve_context(call_frame, arg_strs, bool(args))
 
-        if not args:
+        if not args and not fields:
             # No args - show where we are and when
             time_str = self._format_time()
             if context:
-                return f'{prefix}{context}{DEFAULT_CONTEXT_DELIMITER}{time_str}'
-            return f'{prefix}{time_str}'
+                return f'{head}{context}{DEFAULT_CONTEXT_DELIMITER}{time_str}'
+            return f'{head}{time_str}'
 
-        return self._render(arg_strs, prefix, context, args)
+        return self._render(arg_strs, head, context, args, color, context_arrow, fields)
 
-    def _render(self, arg_strs, prefix, context, args) -> str:
+    def _render(
+        self,
+        arg_strs,
+        prefix,
+        context,
+        args,
+        color: bool,
+        context_arrow: bool = True,
+        fields: Optional[dict] = None,
+    ) -> str:
         """Render the argument pairs into a styled, aligned line."""
         pairs = [
             (None if self._is_bare(expr) else expr, self._argToStringFunction(val))
             for expr, val in zip(arg_strs, args)
         ]
+        # Named fields carry their own label, so they are never "bare" and
+        # never contribute to context detection.
+        pairs.extend(
+            (str(name), self._argToStringFunction(value))
+            for name, value in (fields or {}).items()
+        )
         return render_record(
             prefix,
             context,
             pairs,
-            color=supports_color(sys.stderr),
+            color=color,
             highlight=_colorize,
             delimiter=self._pair_delimiter,
+            context_arrow=context_arrow,
         )
 
     @staticmethod

@@ -2,26 +2,20 @@
 """
 LitPrinter - IceCream-compatible Debug Printing
 
-This module provides ic-style debug printing with Rich-style formatting.
-It's a drop-in replacement for IceCream, and a superset of builtin print().
+``ic`` is the single entry point for terminal output: debugging, printing and
+logging all go through it, so there is one thing to learn and one thing to
+disable.
 
-Usage:
-    # Debugging (zero-import after pip install litprinter)
+Usage::
+
+    from litprinter import ic
+
     x = 42
-    ic(x)              # ic| x: 42
-    ic(x + 1)          # ic| [file.py:1 in <module>] >>> x + 1: 43
-
-    # Printing (drop-in replacement for print())
-    ic.print("hello", "world")                       # hello world
-    ic.print("[bold red]error[/bold red]: boom")     # colored output
-
-    # Logging without importing logging
-    ic.info("server started on :8080")
-    ic.error("connection refused")
-
-    # Configure once
-    ic.configureOutput(prefix="dbg| ", contextMode="never")
-    ic.disable()
+    ic(x)                       # ic| x: 42
+    ic(x * 2)                   # ic| [app.py:5] >>> x * 2: 84
+    ic.print("hello", "world")  # hello world
+    ic("connected", url)        # ERROR/INFO-free plain logging
+    ic("db unreachable", level="error")
 
 Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
@@ -31,26 +25,10 @@ from __future__ import annotations
 
 import inspect
 import sys
-import time
 from typing import IO, Any, Callable, Optional, Union
 
-from .core import IceCreamDebugger, argumentToString
+from .core import IceCreamDebugger, argumentToString, render_level_prefix
 from .markup import render_markup, supports_color
-
-
-# ============================================================================
-# Log levels
-# ============================================================================
-
-_LEVELS = {
-    'debug': ('\033[90m', 'DEBUG'),
-    'info': ('\033[36m', 'INFO '),
-    'success': ('\033[32m', 'OK   '),
-    'warning': ('\033[33m', 'WARN '),
-    'warn': ('\033[33m', 'WARN '),
-    'error': ('\033[31m', 'ERROR'),
-    'critical': ('\033[1;31m', 'CRIT '),
-}
 
 
 def _write(
@@ -74,10 +52,10 @@ class _IceCreamWrapper:
     """Callable debug printer with print() and logging helpers.
 
     This allows:
-        ic(x)                     # Call like a function
-        ic.print("hi")            # Like print(), with markup
-        ic.info("event")          # Logging-style output
-        ic.configureOutput(...)   # Access methods
+        ic(x)                       # Debug print
+        ic(x, level="error")        # Same call, with a severity tag
+        ic.print("hi")              # Like print(), with markup
+        ic.configureOutput(...)     # Access methods
         ic.disable() / ic.enable()
     """
 
@@ -90,24 +68,44 @@ class _IceCreamWrapper:
     def __call__(
         self,
         *args,
+        level: Optional[str] = None,
         includeContext: Optional[bool] = None,
         contextAbsPath: Optional[bool] = None,
+        **fields: Any,
     ) -> Any:
         """Print arguments with their source expressions and return them.
 
+        This is the single entry point for debugging, printing and logging.
+        Pass ``level`` to tag the line with a severity and keyword arguments to
+        attach named fields.
+
         Args:
             *args: Values to debug print.
+            level: Optional severity tag: ``debug``, ``info``, ``success``,
+                ``warning``, ``error`` or ``critical``.
             includeContext: Force file/line context on or off for this call.
             contextAbsPath: Force absolute paths in context for this call.
+            **fields: Named values appended as ``name: value`` pairs. Handy
+                for logging, e.g. ``ic("retrying", attempt=2, level="warn")``.
+                The three keywords above are reserved by the printer.
 
         Returns:
             ``None`` for no args, the single argument, or a tuple of args.
+            ``fields`` never affect the return value.
+
+        Raises:
+            ValueError: If ``level`` is not a known severity.
         """
         debugger = self._debugger
         if not debugger.enabled:
             if not args:
                 return None
             return args[0] if len(args) == 1 else args
+
+        # Validate before touching any state so a typo fails loudly.
+        prefix = None
+        if level is not None:
+            prefix = render_level_prefix(level, color=supports_color(sys.stderr))
 
         orig_context = debugger._includeContext
         orig_abs_path = debugger._contextAbsPath
@@ -119,7 +117,13 @@ class _IceCreamWrapper:
 
             current_frame = inspect.currentframe()
             call_frame = current_frame.f_back if current_frame else None
-            output = debugger._format(call_frame, *args)
+            output = debugger._format(
+                call_frame,
+                *args,
+                prefix=prefix,
+                context_arrow=level is None,
+                fields=fields,
+            )
             debugger._outputFunction(output)
         finally:
             debugger._includeContext = orig_context
@@ -131,11 +135,28 @@ class _IceCreamWrapper:
             return args[0]
         return args
 
-    def format(self, *args) -> str:
-        """Format arguments without printing."""
+    def format(self, *args, level: Optional[str] = None, **fields: Any) -> str:
+        """Format arguments without printing.
+
+        Args:
+            *args: Values to format.
+            level: Optional severity tag, see :meth:`__call__`.
+            **fields: Named values, see :meth:`__call__`.
+        """
+        prefix = (
+            None
+            if level is None
+            else render_level_prefix(level, color=supports_color(sys.stderr))
+        )
         current_frame = inspect.currentframe()
         call_frame = current_frame.f_back if current_frame else None
-        return self._debugger._format(call_frame, *args)
+        return self._debugger._format(
+            call_frame,
+            *args,
+            prefix=prefix,
+            context_arrow=level is None,
+            fields=fields,
+        )
 
     # ------------------------------------------------------------------
     # Printing
@@ -187,85 +208,6 @@ class _IceCreamWrapper:
         if style and use_color:
             line = render_markup(f'[{style}]{line}[/]', color=True)
         _write(line, file=file, end=end, flush=flush)
-
-    # ------------------------------------------------------------------
-    # Logging
-    # ------------------------------------------------------------------
-    def log(
-        self,
-        *values: Any,
-        level: str = 'info',
-        sep: str = ' ',
-        file: Optional[IO[str]] = None,
-        flush: bool = False,
-        timestamp: bool = False,
-        markup: bool = True,
-        color: Optional[bool] = None,
-    ) -> None:
-        """Print a logging-style line without importing ``logging``.
-
-        Args:
-            *values: Values to log.
-            level: One of debug, info, success, warning/warn, error,
-                critical.
-            sep: Separator inserted between values.
-            file: Output stream (defaults to ``sys.stderr``).
-            flush: Flush the stream after writing.
-            timestamp: Prefix the line with the current time.
-            markup: Interpret inline markup tags.
-            color: Force ANSI colors on/off. Defaults to auto-detection.
-        """
-        key = level.lower()
-        if key not in _LEVELS:
-            raise ValueError(
-                f'Unknown log level {level!r}; expected one of '
-                f'{", ".join(sorted(_LEVELS))}'
-            )
-
-        stream = file if file is not None else sys.stderr
-        use_color = supports_color(stream) if color is None else color
-
-        code, label = _LEVELS[key]
-        body = sep.join(
-            render_markup(value, color=use_color)
-            if markup and isinstance(value, str)
-            else str(value)
-            for value in values
-        )
-
-        if use_color:
-            label = f'{code}{label}\033[0m'
-        else:
-            label = label.strip()
-
-        prefix = f'{time.strftime("%H:%M:%S")} ' if timestamp else ''
-        _write(f'{prefix}{label} {body}', file=stream, flush=flush)
-
-    def debug(self, *values: Any, **kwargs: Any) -> None:
-        """Log at DEBUG level."""
-        self.log(*values, level='debug', **kwargs)
-
-    def info(self, *values: Any, **kwargs: Any) -> None:
-        """Log at INFO level."""
-        self.log(*values, level='info', **kwargs)
-
-    def success(self, *values: Any, **kwargs: Any) -> None:
-        """Log at SUCCESS level."""
-        self.log(*values, level='success', **kwargs)
-
-    def warning(self, *values: Any, **kwargs: Any) -> None:
-        """Log at WARNING level."""
-        self.log(*values, level='warning', **kwargs)
-
-    warn = warning
-
-    def error(self, *values: Any, **kwargs: Any) -> None:
-        """Log at ERROR level."""
-        self.log(*values, level='error', **kwargs)
-
-    def critical(self, *values: Any, **kwargs: Any) -> None:
-        """Log at CRITICAL level."""
-        self.log(*values, level='critical', **kwargs)
 
     # ------------------------------------------------------------------
     # Configuration
@@ -382,16 +324,15 @@ def disable() -> None:
     ic.disable()
 
 
-def format(*args) -> str:
-    """Format arguments without printing."""
-    current_frame = inspect.currentframe()
-    call_frame = current_frame.f_back if current_frame else None
-    return ic._debugger._format(call_frame, *args)
+def format(*args, level: Optional[str] = None, **fields: Any) -> str:
+    """Format arguments without printing.
 
-
-def log(*values: Any, level: str = 'info', **kwargs: Any) -> None:
-    """Print a logging-style line (module-level shortcut)."""
-    ic.log(*values, level=level, **kwargs)
+    Args:
+        *args: Values to format.
+        level: Optional severity tag, see :meth:`_IceCreamWrapper.__call__`.
+        **fields: Named values, see :meth:`_IceCreamWrapper.__call__`.
+    """
+    return ic.format(*args, level=level, **fields)
 
 
 # ============================================================================
@@ -407,7 +348,6 @@ __all__ = [
     'lit',
     # Functions
     'print',
-    'log',
     'configureOutput',
     'enable',
     'disable',

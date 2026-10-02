@@ -22,11 +22,12 @@ Key patterns:
 
 ## Architecture
 
-- **`litprint.py`**: `_IceCreamWrapper` — the `ic(x)` callable plus
-  `ic.print()`, `ic.log()`, level shortcuts and `ic.configureOutput()`
+- **`litprint.py`**: `_IceCreamWrapper` — the `ic(x)` callable (debug print,
+  print, and logging via `level=`) plus `ic.print()` and `ic.configureOutput()`
 - **`core.py`**: `IceCreamDebugger` — argument formatting
-  (`argumentToString`), source-expression extraction, context resolution and
-  syntax highlighting
+  (`argumentToString`), source-expression extraction, context resolution,
+  syntax highlighting and the `LOG_LEVELS` / `render_level_prefix()` severity
+  tags used by `ic(..., level=)`. There is no per-level API.
 - **`markup.py`**: inline `[bold red]...[/]` markup → ANSI, used by `ic.print()`
 - **`builtins.py`**: `install()` / `uninstall()` for the builtins registration
 - **`render.py`**: turns a debug record into a styled line — dimmed
@@ -43,12 +44,17 @@ Key patterns:
 
 Core flow: `ic()` → `_IceCreamWrapper.__call__()` → `IceCreamDebugger._format()` → `_colorized_stderr_print()`
 
-## Removed in 0.4.0
+## Removed
 
-`console.py`, `panel.py`, `box.py`, `text.py`, `segment.py` and `style.py` were
-deleted along with their public exports (`Console`, `Panel`, `Box`, `Text`,
-`Span`, `Segment`, `Style`). Do not reintroduce a Rich re-implementation —
-`ic.print()` covers colored output.
+- **0.6.0**: the level methods (`ic.log`, `ic.debug`, `ic.info`, `ic.success`,
+  `ic.warning`, `ic.warn`, `ic.error`, `ic.critical`) and module-level `log()`.
+  Do not add them back — `ic(msg, level=...)` is the only logging surface, so
+  there is exactly one thing to disable and one thing to type.
+- **0.5.0**: `styles/` and `coloring.py`. See above.
+- **0.4.0**: `console.py`, `panel.py`, `box.py`, `text.py`, `segment.py` and
+  `style.py` plus their public exports (`Console`, `Panel`, `Box`, `Text`,
+  `Span`, `Segment`, `Style`). Do not reintroduce a Rich re-implementation —
+  `ic.print()` covers colored output.
 
 ## Build and Test
 
@@ -74,6 +80,13 @@ Package is in `src/litprinter/` (see `package-dir` in pyproject.toml).
 - **Return passthrough**: `ic(x)` returns the value(s) passed to it for inline usage: `result = ic(calculate(x))`
 - **Singledispatch formatters**: Register custom formatters using `@argumentToString.register(MyType)`
 - **Theme**: one theme only (`LitPrinterStyle` in `theme.py`); there is no `set_style()`
+- **One entry point**: `ic()` is the only way to output anything. Severity goes
+  through `ic(..., level=...)`, which swaps the `ic| ` prefix for the tag and
+  sets `context_arrow=False` in the renderer
+- **Fields vs. reserved keywords**: `level`, `includeContext` and
+  `contextAbsPath` are keyword-only printer settings. Every other keyword
+  argument is a named field appended as `name: value`. Fields are printed
+  output, not values: `ic(calc(x), step=i)` returns `calc(x)`.
 
 ## Integration Points
 

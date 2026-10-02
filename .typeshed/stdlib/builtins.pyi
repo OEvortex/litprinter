@@ -5354,36 +5354,26 @@ if sys.version_info >= (3, 13):
 from typing import IO as _LitIO, Any as _LitAny, Callable as _LitCallable
 
 class _LitPrinterDebugger:
-    """IceCream-compatible debug printer."""
+    """Debug printer, print() replacement and logger in one callable."""
 
     def __call__(
         self,
         *values: _LitAny,
+        level: str | None = ...,
         includeContext: bool | None = ...,
         contextAbsPath: bool | None = ...,
+        **fields: _LitAny,
     ) -> _LitAny:
-        """Print ``name: value`` debug output and pass the value(s) through."""
+        """Print ``name: value`` debug output and pass the value(s) through.
+
+        ``level`` tags the line with a severity: ``debug``, ``info``,
+        ``success``, ``warning``, ``error`` or ``critical``. Keyword
+        arguments other than those three are printed as named ``fields``.
+        """
         ...
-    def configureOutput(
-        self,
-        *,
-        prefix: str | _LitCallable[[], str] | None = ...,
-        outputFunction: _LitCallable[[str], None] | None = ...,
-        argToStringFunction: _LitCallable[[_LitAny], str] | None = ...,
-        includeContext: bool | None = ...,
-        contextAbsPath: bool | None = ...,
-        contextMode: str | None = ...,
-        pairDelimiter: str | None = ...,
-    ) -> None:
-        """Configure prefix, context mode, formatters and routing."""
-        ...
-    def enable(self) -> None:
-        """Enable ic() output."""
-        ...
-    def disable(self) -> None:
-        """Disable ic() output."""
-        ...
-    def format(self, *values: _LitAny) -> str:
+    def format(
+        self, *values: _LitAny, level: str | None = ..., **fields: _LitAny
+    ) -> str:
         """Return the formatted debug string instead of printing it."""
         ...
     def print(
@@ -5400,29 +5390,23 @@ class _LitPrinterDebugger:
     ) -> None:
         """Drop-in replacement for print() with inline markup support."""
         ...
-    def log(
+    def configureOutput(
         self,
-        *values: _LitAny,
-        level: str = ...,
-        sep: str = ...,
-        file: _LitIO[str] | None = ...,
-        flush: bool = ...,
-        timestamp: bool = ...,
-        markup: bool = ...,
-        color: bool | None = ...,
+        prefix: str | _LitCallable[[], str] | None = ...,
+        outputFunction: _LitCallable[[str], None] | None = ...,
+        argToStringFunction: _LitCallable[[_LitAny], str] | None = ...,
+        includeContext: bool | None = ...,
+        contextAbsPath: bool | None = ...,
+        contextMode: str | None = ...,
+        pairDelimiter: str | None = ...,
     ) -> None:
-        """Print a logging-style line without importing logging."""
+        """Configure prefix, context mode, formatters and routing."""
         ...
-    def debug(self, *values: _LitAny, **kwargs: _LitAny) -> None: ...
-    def info(self, *values: _LitAny, **kwargs: _LitAny) -> None: ...
-    def success(self, *values: _LitAny, **kwargs: _LitAny) -> None: ...
-    def warning(self, *values: _LitAny, **kwargs: _LitAny) -> None: ...
-    def warn(self, *values: _LitAny, **kwargs: _LitAny) -> None: ...
-    def error(self, *values: _LitAny, **kwargs: _LitAny) -> None: ...
-    def critical(self, *values: _LitAny, **kwargs: _LitAny) -> None: ...
-    @property
-    def enabled(self) -> bool:
-        """Whether ic() output is currently enabled."""
+    def enable(self) -> None:
+        """Enable ic() output."""
+        ...
+    def disable(self) -> None:
+        """Disable ic() output."""
         ...
     def install(self, name: str = ...) -> None:
         """Install ic into builtins."""
@@ -5430,11 +5414,9 @@ class _LitPrinterDebugger:
     def uninstall(self, name: str = ...) -> None:
         """Remove ic from builtins."""
         ...
-    def enable(self) -> None:
-        """Enable ic() output."""
-        ...
-    def disable(self) -> None:
-        """Disable ic() output."""
+    @property
+    def enabled(self) -> bool:
+        """Whether ic() output is currently enabled."""
         ...
 
 ic: _LitPrinterDebugger
