@@ -324,17 +324,17 @@ ic("connected", url, level="info")
 
 Aliases: `LIT`, `litprint`, `lit` all point at `ic`.
 
-## 🗑️ Removed
+## 🗑️ Removed in 0.4.0
 
-- **0.6.0**: the level method family — `ic.log()`, `ic.debug()`, `ic.info()`,
+- **The level methods** — `ic.log()`, `ic.debug()`, `ic.info()`,
   `ic.success()`, `ic.warning()` / `ic.warn()`, `ic.error()`, `ic.critical()`
-  and the module-level `litprinter.log()`. Use `ic(msg, level="error")`.
-  One entry point, one way to turn it off.
-- **0.5.0**: the 19 bundled themes, `litprinter.styles`, `coloring.py`,
-  `set_style()` / `get_style()` and `traceback.install(theme=...)`. There is a
-  single built-in theme.
-- **0.4.0**: the bundled Rich re-implementation — `Console`, `console`,
-  `cprint`, `Panel`, `Box`, `Text`, `Span`, `Segment` and `Style`.
+  and module-level `litprinter.log()`. Use `ic(msg, level="error")`. One entry
+  point means one thing to type and one thing to turn off.
+- **The bundled themes** — `litprinter.styles` (19 themes), `coloring.py`,
+  `set_style()` / `get_style()` and `traceback.install(theme=...)`. There is now
+  exactly one built-in theme, `LitPrinterStyle`.
+- **The bundled Rich re-implementation** — `Console`, `console`, `cprint`,
+  `Panel`, `Box`, `Text`, `Span`, `Segment` and `Style`.
   `ic.print(markup=True)` covers the colored-output use case; use the real
   [Rich](https://github.com/Textualize/rich) for full console rendering.
 

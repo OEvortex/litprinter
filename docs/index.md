@@ -259,17 +259,18 @@ uninstall()   # remove ic from builtins
 
 Aliases: `LIT`, `litprint`, `lit`.
 
-## Removed
+## Removed in 0.4.0
 
-- **0.6.0**: the level method family — `ic.log()`, `ic.debug()`, `ic.info()`,
-  `ic.success()`, `ic.warning()` / `ic.warn()`, `ic.error()`, `ic.critical()`
-  and module-level `litprinter.log()`. Use `ic(msg, level="error")`.
-- **0.5.0**: the 19 bundled themes and `litprinter.styles`, plus `set_style()`
-  and `traceback.install(theme=...)`. One built-in theme remains.
-- **0.4.0**: the bundled Rich re-implementation — `Console`, `console`,
-  `cprint`, `Panel`, `Box`, `Text`, `Span`, `Segment` and `Style`. Use
-  `ic.print()` for colored markup, or
-  [Rich](https://github.com/Textualize/rich) for full console rendering.
+- The level methods — `ic.log()`, `ic.debug()`, `ic.info()`, `ic.success()`,
+  `ic.warning()` / `ic.warn()`, `ic.error()`, `ic.critical()` and module-level
+  `litprinter.log()`. Use `ic(msg, level="error")`.
+- The bundled themes — `litprinter.styles` (19 themes), `coloring.py`,
+  `set_style()` / `get_style()` and `traceback.install(theme=...)`. One
+  built-in theme remains: `LitPrinterStyle`.
+- The bundled Rich re-implementation — `Console`, `console`, `cprint`, `Panel`,
+  `Box`, `Text`, `Span`, `Segment` and `Style`. Use `ic.print()` for colored
+  markup, or [Rich](https://github.com/Textualize/rich) for full console
+  rendering.
 
 ## Migration
 
@@ -289,6 +290,6 @@ from icecream import ic   # before
 
 ## Version
 
-Current version: **0.6.0**
+Current version: **0.4.0**
 
 For more examples, see the [GitHub repository](https://github.com/OEvortex/litprinter).

@@ -44,16 +44,18 @@ Key patterns:
 
 Core flow: `ic()` → `_IceCreamWrapper.__call__()` → `IceCreamDebugger._format()` → `_colorized_stderr_print()`
 
-## Removed
+## Removed in 0.4.0
 
-- **0.6.0**: the level methods (`ic.log`, `ic.debug`, `ic.info`, `ic.success`,
+- The level methods (`ic.log`, `ic.debug`, `ic.info`, `ic.success`,
   `ic.warning`, `ic.warn`, `ic.error`, `ic.critical`) and module-level `log()`.
   Do not add them back — `ic(msg, level=...)` is the only logging surface, so
   there is exactly one thing to disable and one thing to type.
-- **0.5.0**: `styles/` and `coloring.py`. See above.
-- **0.4.0**: `console.py`, `panel.py`, `box.py`, `text.py`, `segment.py` and
-  `style.py` plus their public exports (`Console`, `Panel`, `Box`, `Text`,
-  `Span`, `Segment`, `Style`). Do not reintroduce a Rich re-implementation —
+- `styles/` (19 themes) and `coloring.py` (5 more), along with `set_style()` /
+  `get_style()` and `traceback.install(theme=...)`. One theme remains:
+  `LitPrinterStyle` in `theme.py`. Do not add themes back.
+- `console.py`, `panel.py`, `box.py`, `text.py`, `segment.py` and `style.py`
+  plus their public exports (`Console`, `Panel`, `Box`, `Text`, `Span`,
+  `Segment`, `Style`). Do not reintroduce a Rich re-implementation —
   `ic.print()` covers colored output.
 
 ## Build and Test

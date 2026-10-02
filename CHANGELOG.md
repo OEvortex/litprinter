@@ -5,87 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6.0] - 2026-10-02
-
-`ic()` is now the only entry point for everything: debugging, printing, and
-logging. The level *methods* are gone; the same call with a keyword does it.
-
-### Added
-
-- `ic(*values, level=...)` tags a line with a severity: `debug`, `info`,
-  `success`/`ok`, `warning`/`warn`, `error`, `critical`. An unknown level raises
-  `ValueError` with the list of valid names, and the debugger's state is left
-  untouched when it does.
-- `ic.format(*values, level=...)` returns a leveled line without printing it.
-- Named fields: keyword arguments other than `level`, `includeContext` and
-  `contextAbsPath` are printed as `name: value` pairs, so logging reads the way
-  it is normally written — `ic("retrying", attempt=2, level="warning")`. Fields
-  use `argumentToString`, honour `pairDelimiter`, and never affect the return
-  value, so `result = ic(calculate(x), step=i)` still returns `calculate(x)`.
-
-### Changed
-
-- A leveled line replaces the `ic| ` prefix with the severity tag and drops the
-  `>>> ` context arrow, so it reads as a log record rather than an expression
-  dump. Context, multi-line alignment, color detection and `ic.disable()` all
-  behave exactly as they do for a plain `ic(x)`.
-
-### Removed
-
-- `ic.log()`, `ic.debug()`, `ic.info()`, `ic.success()`, `ic.warning()` /
-  `ic.warn()`, `ic.error()`, `ic.critical()` and the module-level
-  `litprinter.log()`. Use `ic(msg, level="error")`.
-
-## [0.5.0] - 2026-10-02
-
-LitPrinter now owns the whole terminal output story: debug printing, `print()`,
-logging, syntax highlighting and tracebacks, all in one consistent look.
-
-### Added
-
-- **Automatic traceback installation.** Installing litprinter now also installs
-  the pretty traceback hook for every Python process, so readable tracebacks
-  work with no setup. Opt out with `LITPRINTER_NO_TRACEBACK=1`, or disable
-  litprinter entirely with `LITPRINTER_NO_AUTOLOAD=1`.
-- **Rich-like rendering** (`render.py`): the prefix and file/line context are
-  dimmed, variable names get their own colour, values are syntax highlighted
-  automatically, and multi-line values hang off the first line instead of
-  restarting at column 0.
-- `LitPrinterStyle`, a single hand-tuned theme tuned for long debugging
-  sessions, shared by `ic()`, `ic.print(..., highlight=True)` and tracebacks.
-
-### Fixed
-
-- `colorama.init()` was being called on every platform, which wraps
-  `sys.stdout`/`sys.stderr` and **strips ANSI codes whenever output is piped**.
-  All highlighting was silently lost when redirecting to a file. It is now only
-  used on Windows.
-- `ic()` and `ic.print()` now share one color-detection path, so `NO_COLOR`,
-  `FORCE_COLOR` and `TERM=dumb` behave identically for both.
-- `traceback.install()` documented that it returns the previous hook but
-  returned a different function depending on the branch taken.
-
-### Changed
-
-- Traceback layout: Rich-style `── Traceback (most recent call last) ──` header
-  with a timestamp, a thinner separator rule, and library frames dimmed and
-  tagged `[library]` so your own frames stand out.
-- Colors are decided from the destination stream, so `ic()` output keeps its
-  highlighting when piped.
-
-### Removed
-
-- The 19 bundled themes (`litprinter.styles`, ~1900 lines) and the 5 styles in
-  `coloring.py`. There is now exactly one theme.
-- `set_style()` / `get_style()` and `traceback.install(theme=...)`. Use
-  `litprinter.LitPrinterStyle` if you need to reference the style.
-- `coloring.py` (replaced by `theme.py`).
-
 ## [0.4.0] - 2026-10-02
 
-LitPrinter is now one focused tool: a debug printer, a `print()` replacement, a
-logging shortcut and pretty tracebacks. This release squashes the earlier
-0.3.4/0.3.5/0.4.x work into a single release.
+LitPrinter is now one focused tool for terminal output: a debug printer, a
+`print()` replacement, a logger and pretty tracebacks, all in one consistent
+look with a single built-in theme. This release squashes the earlier
+0.3.4/0.3.5/0.4.x/0.5.x/0.6.x work into one release.
 
 ### Added
 
@@ -98,9 +23,19 @@ logging shortcut and pretty tracebacks. This release squashes the earlier
   `#hex` and `rgb(r,g,b)` values, closed with `[/]`
 - `litprinter.print` alias, so `from litprinter import print` works
 
-**Logging**
-- `ic.log(*values, level=)` and the `ic.debug/info/success/warning/error/critical`
-  shortcuts; output goes to stderr so piped stdout stays clean
+**Logging through ic()**
+- `ic(*values, level=...)` tags a line with a severity: `debug`, `info`,
+  `success`/`ok`, `warning`/`warn`, `error`, `critical`. An unknown level raises
+  `ValueError` listing the valid names and leaves debugger state untouched.
+- Named fields: keyword arguments other than `level`, `includeContext` and
+  `contextAbsPath` print as `name: value` pairs, so logging reads the way it is
+  normally written — `ic("retrying", attempt=2, level="warning")`. Fields
+  honour `argumentToString` and `pairDelimiter`, and never affect the return
+  value, so `result = ic(calculate(x), step=i)` still returns `calculate(x)`.
+- `ic.format(*values, level=..., **fields)` returns the same line as a string
+  without printing it.
+- Output goes to stderr so piped stdout stays clean; `ic.disable()` silences
+  leveled lines too.
 
 **Debugging**
 - `contextMode` (`'auto' | 'always' | 'never'`) plus per-call
@@ -112,9 +47,25 @@ logging shortcut and pretty tracebacks. This release squashes the earlier
   (which now round-trip all four registered names)
 - `pairDelimiter` option in `configureOutput()`
 
+**Rendering** (new `render.py`)
+- The prefix and file/line context are dimmed, variable names get their own
+  colour, and values are syntax highlighted automatically
+- Multi-line values hang off the first line instead of restarting at column 0,
+  and the indent accounts for the prefix *and* the context column
+- A leveled line replaces the `ic| ` prefix with the severity tag and drops the
+  `>>> ` context arrow, so it reads as a log record
+
 **Tracebacks**
+- Installed automatically for every Python process by the `.pth` autoloader, so
+  readable tracebacks work with no setup. Opt out with
+  `LITPRINTER_NO_TRACEBACK=1`, or disable litprinter entirely with
+  `LITPRINTER_NO_AUTOLOAD=1`. Both are best-effort and can never break
+  interpreter startup.
+- Rich-style `── Traceback (most recent call last) ──` header with a timestamp,
+  a thinner separator rule, and library frames dimmed and tagged `[library]` so
+  your own frames stand out
 - `install()` now honours `suppress=`, `max_frames=`, `locals_hide_sunder=`;
-  `max_frames` reports how many frames it dropped
+  `max_frames` reports how many frames it dropped, and `max_frames=0` truncates
 
 **Packaging and tooling**
 - Linux autoload: the `.pth` is a valid `import` line and is installed into
@@ -125,21 +76,47 @@ logging shortcut and pretty tracebacks. This release squashes the earlier
   builtins for ty, pyright/Pylance and mypy (hover docs, completions, no
   "name not defined" errors)
 - `py.typed` so type checkers use the inline annotations
-- Test suite: 72 tests across `ic()`, `ic.print()`, logging, markup, builtins
-  and tracebacks
+- Test suite: 95 tests across `ic()`, `ic.print()`, levels and fields, markup,
+  builtins and tracebacks
 
 ### Changed
 
 - Module-level `ic()` calls no longer print an `in <module>` suffix; the
   context is just `file:line` (e.g. `ic| [test.py:15] >>> add(5, 3): 8`).
   Inside functions the `in name()` suffix is still added.
+- One theme: the new `theme.py` provides `LitPrinterStyle`, a quiet palette
+  tuned for long debugging sessions, shared by `ic()`, `ic.print(highlight=True)`
+  and tracebacks. Roughly 2400 lines of bundled themes were deleted.
+- `ic()` and `ic.print()` now share one colour-detection path, so `NO_COLOR`,
+  `FORCE_COLOR` and `TERM=dumb` behave identically for both.
 - Pygments, colorama, executing and asttokens are now plain imports rather than
   optional-import guards — they are all declared dependencies
 - `litprinter.colors` trimmed to the ANSI helpers actually used
-- README and docs rewritten around `ic()`, `ic.print()` and logging
+- README and docs rewritten around `ic()`, `ic.print()`, logging and the
+  auto-installed traceback
+
+### Fixed
+
+- `colorama.init()` was being called on every platform. It wraps
+  `sys.stdout`/`sys.stderr` and strips ANSI codes whenever the stream is not a
+  TTY, so all highlighting was silently lost when output was piped to a file or
+  captured. It is now only used on Windows.
+- `traceback.install()` documented that it returns the previous hook but
+  returned a different function depending on the branch taken.
+- Markup parsing: `on_gray`/`on_grey`/`bright_gray`/`bright_grey` raised
+  `KeyError`; an unmatched `[/]` was dropped; `[]` was treated as markup;
+  `install()`/`uninstall()` did not round-trip all four registered names; and
+  a bad `theme=` recorded an invalid value instead of falling back.
 
 ### Removed
 
+- The level method family — `ic.log()`, `ic.debug()`, `ic.info()`,
+  `ic.success()`, `ic.warning()` / `ic.warn()`, `ic.error()`, `ic.critical()`
+  and module-level `litprinter.log()`. Use `ic(msg, level="error")`. One
+  entry point means one thing to type and one thing to turn off.
+- The 19 bundled themes (`litprinter.styles`), the 5 styles in `coloring.py`,
+  `set_style()` / `get_style()` and `traceback.install(theme=...)`. There is now
+  exactly one theme.
 - Bundled Rich re-implementation: `Console`, `console`, `cprint`, `Panel`,
   `Box`, `Text`, `Span`, `Segment`, `Style`, plus the dead
   `clearStyleCache`, `getStyleCacheInfo`, `isTerminalCapable` and
@@ -149,10 +126,6 @@ logging shortcut and pretty tracebacks. This release squashes the earlier
   `__rich_measure__`)
 - Dead `word_wrap` and `locals_max_length` traceback options, which were
   accepted but never applied
-
-> Note: `litprinter.styles` (the 19 traceback themes) is still shipped — the
-> traceback renderer depends on it. Use `traceback.install(theme=...)` to pick
-> one.
 
 ## [0.3.3] - 2025-12-08
 
