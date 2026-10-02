@@ -1,119 +1,66 @@
 #!/usr/bin/env python3
 """
-LitPrinter - The Most Sophisticated Debug Printing Library for Python
+LitPrinter - The Debug Printer That Replaces print(), logging and icecream
 
-A comprehensive terminal output library combining IceCream debugging
-with Rich-style formatting:
+A single, opinionated tool for terminal output:
 
-- IceCream-compatible ic() function with configureOutput(), enable/disable
-- Styled console output with markup support
-- Beautiful bordered panels with multiple styles  
-- Pretty tracebacks with syntax highlighting
-- Colors, styles, and text formatting utilities
+- ``ic(...)``        - debug print with automatic source expressions
+- ``ic.print(...)``  - drop-in replacement for ``print()`` with markup
+- ``ic.info(...)``   - logging without importing ``logging``
+- ``traceback``      - syntax highlighted tracebacks
 
-Usage:
-    from litprinter import ic
-    
+Everything is available as a builtin after ``pip install litprinter``:
+
     x = 42
-    ic(x)  # Output: ic| x: 42
-    
-    # Configure output
-    ic.configureOutput(prefix='DEBUG| ')
-    ic.configureOutput(includeContext=True)
-    
-    # Enable/disable
-    ic.disable()
-    ic.enable()
-    
-    # Format without printing  
-    s = ic.format(x)
-    
-    # Rich-style console
-    from litprinter import Console, Panel
-    console = Console()
-    console.print("[bold red]Error:[/bold red] Something went wrong!")
-    print(Panel("Hello!", title="Greeting"))
+    ic(x)                                  # ic| x: 42
+    ic.print("[bold green]done[/]")         # done
+    ic.info("server ready")                 # INFO  server ready
 
 Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
 """
 
 # ============================================================================
-# IceCream-compatible Debug Printing (Main Feature)
+# Debug Printing / Printing / Logging
 # ============================================================================
 
 from .litprint import (
-    ic,           # Main debug function
-    LIT,          # Alias
-    litprint,     # Alias  
-    lit,          # Alias
-    configureOutput,  # Configure ic output
-    enable,       # Enable ic output
-    disable,      # Disable ic output
-    format,       # Format without printing
-    set_style,    # Set color style
-    get_style,    # Get current style
-    argumentToString,  # Custom formatters
-    IceCreamDebugger,  # Core class
+    ic,             # Main debug printer
+    LIT,            # Alias
+    litprint,       # Alias
+    lit,            # Alias
+    print,          # Drop-in replacement for builtin print()
+    log,            # Logging-style output
+    configureOutput,
+    enable,
+    disable,
+    format,
+    set_style,
+    get_style,
+    argumentToString,
+    IceCreamDebugger,
 )
 
 # Legacy alias
 from .core import LITPrintDebugger
 
-# ============================================================================
-# Builtins Installation
-# ============================================================================
-
 from .builtins import install, uninstall
 
-# Auto-install ic to builtins when litprinter is imported
-# This makes ic() available globally after `pip install litprinter`
-_builtins = __import__('builtins')
-setattr(_builtins, "ic", ic)
-setattr(_builtins, "LIT", LIT)
-setattr(_builtins, "litprint", litprint)
+from .markup import render_markup, strip_markup, supports_color
 
 # ============================================================================
-# Colors and Styling
+# Themes (used by ic output and tracebacks)
 # ============================================================================
 
 from .coloring import (
-    TokyoNight,       # Tokyo Night theme (NEW DEFAULT)
-    LitStyle,         # Catppuccin-inspired (brighter)
-    SolarizedDark,    # IceCream-compatible
-    CyberpunkStyle,   # Neon cyberpunk
-    MonokaiStyle,     # Classic Monokai
-    DEFAULT_STYLE,    # Current default
+    TokyoNight,
+    LitStyle,
+    SolarizedDark,
+    CyberpunkStyle,
+    MonokaiStyle,
+    DEFAULT_STYLE,
 )
 from .colors import Colors
-
-# ============================================================================
-# Rich-style Infrastructure Modules
-# ============================================================================
-
-from .segment import Segment, ControlType, ControlCode, render_segments
-
-from .style import Style, NULL_STYLE, style, BOLD, DIM, ITALIC, UNDERLINE
-
-from .text import Text, Span
-
-from .box import (
-    Box, ROUNDED, HEAVY, DOUBLE, SQUARE, ASCII, DASHED, DOTTED,
-    NONE as BOX_NONE, get_box, render_box
-)
-
-# ============================================================================
-# Console with Rich-like Features
-# ============================================================================
-
-from .console import Console, console, cprint
-from .console import print
-
-# ============================================================================
-# Panel Rendering
-# ============================================================================
-
-from .panel import Panel, BorderStyle, Padding, Shadow, Background, PanelGroup, panel
 
 # ============================================================================
 # Traceback Formatting
@@ -128,25 +75,28 @@ from .traceback import (
 )
 
 # ============================================================================
-# Styles/Themes
+# Builtins Installation
 # ============================================================================
 
-try:
-    from .styles import (
-        JARVIS, RICH, MODERN, NEON, CYBERPUNK, DRACULA, MONOKAI,
-        SOLARIZED, NORD, GITHUB, VSCODE, MATERIAL, RETRO, OCEAN,
-        AUTUMN, SYNTHWAVE, FOREST, MONOCHROME, SUNSET,
-        create_custom_style,
-    )
-except ImportError:
-    # Styles package not available
-    pass
+# Auto-register ic in builtins on import, so `ic` works in every script after
+# `pip install litprinter` without an explicit import. setattr() is used
+# because static type checkers model builtins from typeshed, not from runtime.
+import builtins as _builtins
+
+for _name, _value in (
+    ("ic", ic),
+    ("LIT", LIT),
+    ("litprint", litprint),
+    ("lit", lit),
+):
+    setattr(_builtins, _name, _value)
 
 # ============================================================================
 # Version
 # ============================================================================
 
-__version__ = '0.3.5'
+__version__ = '0.4.0'
+
 
 # ============================================================================
 # Public API
@@ -155,9 +105,13 @@ __version__ = '0.3.5'
 __all__ = [
     # Main IceCream-compatible API
     "ic",
-    "LIT", 
+    "LIT",
     "litprint",
     "lit",
+    # Printing
+    "print",
+    "log",
+    # Configuration
     "configureOutput",
     "enable",
     "disable",
@@ -167,10 +121,14 @@ __all__ = [
     "argumentToString",
     "IceCreamDebugger",
     "LITPrintDebugger",
-    # Builtins (like IceCream)
+    # Builtins
     "install",
     "uninstall",
-    # Color Styles
+    # Markup
+    "render_markup",
+    "strip_markup",
+    "supports_color",
+    # Themes
     "TokyoNight",
     "SolarizedDark",
     "LitStyle",
@@ -178,74 +136,12 @@ __all__ = [
     "MonokaiStyle",
     "DEFAULT_STYLE",
     "Colors",
-    # Segment
-    "Segment",
-    "ControlType",
-    "ControlCode",
-    "render_segments",
-    # Style
-    "Style",
-    "NULL_STYLE",
-    "style",
-    "BOLD",
-    "DIM",
-    "ITALIC",
-    "UNDERLINE",
-    # Text
-    "Text",
-    "Span",
-    # Box
-    "Box",
-    "ROUNDED",
-    "HEAVY",
-    "DOUBLE",
-    "SQUARE",
-    "ASCII",
-    "DASHED",
-    "DOTTED",
-    "BOX_NONE",
-    "get_box",
-    "render_box",
-    # Console
-    "Console",
-    "console",
-    "cprint",
-    "console_print",
-    # Panel
-    "Panel",
-    "BorderStyle",
-    "Padding",
-    "Shadow",
-    "Background",
-    "PanelGroup",
-    "panel",
     # Traceback
     "traceback",
     "PrettyTraceback",
     "Traceback",
     "install_traceback",
     "uninstall_traceback",
-    # Styles
-    "JARVIS",
-    "RICH",
-    "MODERN", 
-    "NEON",
-    "CYBERPUNK",
-    "DRACULA",
-    "MONOKAI",
-    "SOLARIZED",
-    "NORD",
-    "GITHUB",
-    "VSCODE",
-    "MATERIAL",
-    "RETRO",
-    "OCEAN",
-    "AUTUMN",
-    "SYNTHWAVE",
-    "FOREST",
-    "MONOCHROME",
-    "SUNSET",
-    "create_custom_style",
     # Version
     "__version__",
 ]

@@ -1,12 +1,13 @@
 <div align="center">
   <a href="https://github.com/OEvortex/litprinter">
-    <img src="https://img.shields.io/badge/LitPrinter-IceCream%20+%20Rich-blue?style=for-the-badge&logo=python&logoColor=white" alt="LitPrinter Logo">
+    <img src="https://img.shields.io/badge/LitPrinter-print%20%2B%20debug-blue?style=for-the-badge&logo=python&logoColor=white" alt="LitPrinter Logo">
   </a>
   <br/>
   <h1>🔥 LitPrinter</h1>
-  <p><strong>IceCream + Rich = LitPrinter — The ultimate debug printing library for Python</strong></p>
+  <p><strong>The debug printer that replaces print(), logging and icecream</strong></p>
   <p>
-    A powerful fusion of IceCream-style debugging with Rich-style formatting, syntax highlighting, and beautiful tracebacks.
+    One tool for your terminal: smart debugging, a drop-in <code>print()</code>,
+    logging without <code>logging</code>, and beautiful tracebacks.
   </p>
 
   <!-- Badges -->
@@ -20,16 +21,14 @@
 
 ## 🚀 Why LitPrinter?
 
-LitPrinter is a **drop-in replacement for IceCream** with additional Rich-style features:
-
-| Feature | print() | IceCream | LitPrinter |
-|---------|---------|----------|------------|
-| Shows variable names | ❌ | ✅ | ✅ |
-| Syntax highlighting | ❌ | ✅ | ✅ |
-| Rich-style panels | ❌ | ❌ | ✅ |
-| Pretty tracebacks | ❌ | ❌ | ✅ |
-| Configurable colors | ❌ | ❌ | ✅ |
-| Enable/disable toggle | ❌ | ✅ | ✅ |
+| Feature | `print()` | IceCream | logging | LitPrinter |
+|---------|-----------|----------|---------|------------|
+| Shows variable names | ❌ | ✅ | ❌ | ✅ |
+| Replaces `print()` | ❌ | ❌ | ❌ | ✅ |
+| Colored markup output | ❌ | ❌ | ❌ | ✅ |
+| Auto context when useful | ❌ | ❌ | ✅ | ✅ |
+| Pretty tracebacks | ❌ | ❌ | ❌ | ✅ |
+| Zero-import (works everywhere) | — | ❌ | — | ✅ |
 
 ## ⚡ Quick Start
 
@@ -40,149 +39,150 @@ pip install litprinter
 ```python
 # No import needed! ic is automatically available
 x = 42
-ic(x)  # Output: ic| x: 42
+ic(x)                      # ic| x: 42
+ic.print("hello", x)       # hello 42
+ic.info("server started")  # INFO  server started
 ```
 
-That's it! After installing, `ic()` is automatically available in all your Python scripts - no import required!
+That's it. After `pip install litprinter`, `ic` is available in **every** Python
+script — no import required.
 
-> This project ships `.typeshed` with `ic`/`LIT`/`litprint`/`lit` declared in
-> `builtins.pyi`, so editors using the project's ty/pyright/mypy config can
-> treat them like ordinary builtins. For maximal portability, explicit
-> `from litprinter import ic` is still best.
+> Editors: this repo ships a patched typeshed (`.typeshed`) so `ic` is typed as
+> a real builtin for ty, Pylance/pyright and mypy, with hover docs and
+> completions like `print()`.
 
-## 🎯 IceCream-Compatible API
-
-LitPrinter is fully compatible with IceCream's API:
+## 🐛 Debugging that explains itself
 
 ```python
-from litprinter import ic
-
-# Basic debugging
-x, y = 10, 20
-ic(x, y)  # ic| x: 10, y: 20
-
-# Works with expressions
-ic(x * 2)  # ic| x * 2: 20
-
-# Configure output
-ic.configureOutput(prefix='DEBUG| ')
-ic.configureOutput(includeContext=True)
-
-# Enable/disable
-ic.disable()  # Silent, but still returns values
-ic.enable()   # Re-enable output
-
-# Format without printing
-s = ic.format(x, y)
+def calculate(a, b):
+    total = a + b
+    ic(total)              # ic| total: 30        <- name is obvious, no noise
+    ic(total / len(items)) # ic| [app.py:3 in calculate()] >>> total / len(items): 10.0
+    ic()                   # ic| app.py:3 in calculate() - 14:02:11.004
+    return total
 ```
 
-## 🎨 Color Themes
+Context is added **only when it helps**:
 
-LitPrinter includes multiple color themes:
+| Call | Context shown? | Why |
+|------|----------------|-----|
+| `ic(x)` | no | the name is already printed |
+| `ic(x + 1)` | yes | the expression matters |
+| `ic(items[0])` | yes | needs a location |
+| `ic(f"hi {name}")` | no | the value is self-describing |
+| `ic()` | yes | acts as a "where am I" breadcrumb |
+
+Override it any time:
 
 ```python
-from litprinter import ic, set_style, SolarizedDark, LitStyle, CyberpunkStyle, MonokaiStyle
+ic(x, includeContext=True)   # force context for this call
+ic(x, includeContext=False)  # suppress context for this call
 
-# Default is SolarizedDark (IceCream-compatible)
+ic.configureOutput(contextMode="always")  # 'auto' (default) | 'always' | 'never'
+```
+
+## 🖨️ `ic.print` — drop-in `print()` replacement
+
+Same signature as builtin `print()`, so you can sed-replace `print(` → `ic.print(`:
+
+```python
+ic.print("plain")                                   # plain
+ic.print("a", "b", sep=" | ", end="!\n")            # a | b!
+ic.print("to stderr", file=sys.stderr, flush=True)
+
+# Inline markup (Rich-style tags, zero dependencies)
+ic.print("[bold red]ERROR[/bold red] connection refused")
+ic.print("[on_blue] INFO [/on_blue] listening on :8080")
+ic.print("styled", style="bold cyan")
+
+# Syntax highlight non-string values
+ic.print({"port": 8080, "host": "0.0.0.0"}, highlight=True)
+
+# Disable markup if your data contains brackets
+ic.print("[not markup]", markup=False)
+```
+
+Supported tags: `bold`, `dim`, `italic`, `underline`, `strike`, `reverse`,
+`blink`, the 8/16 colors (`red`, `bright_red`, …), backgrounds (`on_blue`, …),
+`#ff8800` hex colors, `rgb(255,0,0)`, and `[/]` to close.
+
+`litprinter.print` is exported too, so `from litprinter import print` works.
+
+## 📋 Logging without `logging`
+
+```python
+ic.debug("cache miss", key)
+ic.info("connected", url)
+ic.success("migration complete")
+ic.warning("retrying in 5s", attempt=2)
+ic.error("request failed", status=500)
+ic.critical("disk full")
+
+# Or generic
+ic.log("custom level line", level="info")
+ic.log("with timestamp", level="warn", timestamp=True)
+
+# Or module-level
+from litprinter import log
+log("hello", level="info")
+```
+
+Levels: `debug`, `info`, `success`, `warning`/`warn`, `error`, `critical`.
+Output goes to stderr so it stays out of your piped stdout.
+
+## 🧵 Inline usage
+
+```python
+result = ic(calculate(x))  # prints AND returns the value
+```
+
+## 🎨 Themes
+
+```python
+from litprinter import ic, set_style, LitStyle, CyberpunkStyle, MonokaiStyle
+
 ic(x)
-
-# Switch to vibrant LitStyle
-set_style(LitStyle)
+set_style(LitStyle)       # vibrant and modern
 ic(x)
-
-# Try neon Cyberpunk
-set_style(CyberpunkStyle)
-ic(x)
-
-# Classic Monokai
-set_style(MonokaiStyle)
-ic(x)
+set_style(CyberpunkStyle) # neon
+set_style(MonokaiStyle)   # classic code editor
 ```
 
-**Available Themes:**
-- `SolarizedDark` - IceCream-compatible (default)
-- `LitStyle` - Vibrant and modern
-- `CyberpunkStyle` - Neon pink, teal, green
-- `MonokaiStyle` - Classic code editor theme
+Available: `TokyoNight` (default), `SolarizedDark`, `LitStyle`,
+`CyberpunkStyle`, `MonokaiStyle`.
 
-## ✨ Features
-
-### 📊 Smart Object Formatting
+## 💥 Beautiful tracebacks
 
 ```python
-data = {
-    "users": ["alice", "bob"],
-    "settings": {"theme": "dark"}
-}
-ic(data)  # Formatted with proper indentation and highlighting
-```
+from litprinter import traceback
 
-### 🔍 Context-Aware Output
-
-```python
-def calculate_total(a, b):
-    ic(a, b, includeContext=True)
-    # Output: ic| [script.py:3 in calculate_total()] >>> a: 10, b: 20
-    return a + b
-```
-
-### 🧵 Inline Usage
-
-```python
-# Use inline - ic() returns the value
-result = ic(calculate(x))  # Prints AND returns the value
-```
-
-### 💥 Beautiful Tracebacks
-
-```python
-from litprinter.traceback import install
-
-install(
+traceback.install(
     theme="cyberpunk",
     show_locals=True,
-    extra_lines=3
+    extra_lines=3,
 )
-
-# Now all exceptions show beautiful tracebacks!
 ```
 
-### 🖼️ Rich-Style Panels
-
-```python
-from litprinter import Panel, Console
-
-# Create bordered panels
-panel = Panel("Hello, World!", title="Greeting")
-print(panel)
-
-# Rich-style console
-console = Console()
-console.print("[bold red]Error:[/bold red] Something went wrong!")
-```
+Shows syntax-highlighted source, local variables, and a clean layout for
+uncaught exceptions.
 
 ## 🔧 Configuration
 
-### Global Configuration
-
 ```python
-from litprinter import ic
-
 ic.configureOutput(
-    prefix='DEBUG| ',           # Custom prefix
-    includeContext=True,        # Show file/line/function
-    contextAbsPath=False,       # Use relative paths
-    outputFunction=my_logger,   # Custom output function
+    prefix="dbg| ",            # custom prefix
+    contextMode="auto",        # 'auto' | 'always' | 'never'
+    contextAbsPath=False,      # relative paths in context
+    pairDelimiter=", ",        # separator between debugged values
+    outputFunction=my_logger,  # send output anywhere
 )
+
+ic.disable()   # silent, but still returns values
+ic.enable()
+s = ic.format(x, y)   # format without printing
 ```
 
-### Per-Call Override
-
-```python
-ic(x, includeContext=True)  # Override for this call only
-```
-
-### Custom Formatters
+### Custom formatters
 
 ```python
 from litprinter import argumentToString
@@ -198,81 +198,61 @@ def format_myclass(obj):
 ic(MyClass("test"))  # ic| MyClass(test)
 ```
 
-## 🌐 Always Available
+## 🔁 Migration
 
-After `pip install litprinter`, `ic()` is **automatically available** in all Python scripts - no import needed!
-
-```python
-# my_script.py - no import required!
-x = 42
-ic(x)  # Just works!
-```
-
-If you want to temporarily disable:
-```python
-from litprinter import uninstall
-uninstall()  # Remove ic from builtins
-
-# To re-enable:
-from litprinter import install
-install()
-```
-
-## 📦 Migration from IceCream
-
-Just change your import:
+From **IceCream**:
 
 ```python
-# Before
+# before
 from icecream import ic
-
-# After
-from litprinter import ic
+# after: nothing to do - ic is already a builtin after install
 ```
 
-All IceCream features work identically, plus you get:
-- Multiple color themes
-- Rich-style panels and console
-- Beautiful tracebacks
-- Panel rendering
+From **`print()`**:
+
+```python
+# before
+print(f"user: {user['name']}")
+# after - shows the expression, no f-string needed
+ic(user["name"])
+```
+
+From **`logging`**:
+
+```python
+# before
+logger.info("connected to %s", url)
+# after
+ic.info("connected", url)
+```
 
 ## 📚 API Reference
 
-### Main Functions
-
-| Function | Description |
-|----------|-------------|
-| `ic(*args)` | Debug print with variable names |
-| `ic.configureOutput(...)` | Configure output settings |
-| `ic.disable()` / `ic.enable()` | Toggle output |
+| API | Description |
+|-----|-------------|
+| `ic(*args)` | Debug print with source expressions and passthrough return |
+| `ic.print(*values, sep=, end=, file=, flush=, markup=, style=, highlight=)` | `print()` replacement with markup |
+| `ic.log(*values, level=)` | Logging-style output |
+| `ic.debug/info/success/warning/error/critical(*values)` | Level shortcuts |
+| `ic.configureOutput(...)` | Configure prefix, context, formatters, output |
+| `ic.disable()` / `ic.enable()` | Toggle debug output |
 | `ic.format(*args)` | Format without printing |
-| `set_style(style)` | Set color theme |
+| `ic.install()` / `ic.uninstall()` | (Un)register the builtins |
+| `set_style(style)` / `get_style()` | Theme control |
+| `argumentToString.register(Type)` | Custom value formatters |
+| `traceback.install(...)` | Pretty tracebacks |
 
-### Aliases
+Aliases: `LIT`, `litprint`, `lit` all point at `ic`.
 
-| Alias | Same as |
-|-------|---------|
-| `LIT` | `ic` |
-| `litprint` | `ic` |
-| `lit` | `ic` |
+## 🗑️ Removed in 0.4.0
 
-### Traceback Functions
+The bundled Rich re-implementation was removed so the package stays small and
+focused on printing/debugging:
 
-| Function | Description |
-|----------|-------------|
-| `traceback.install(**kwargs)` | Install pretty tracebacks |
-| `traceback.uninstall()` | Restore default tracebacks |
-| `PrettyTraceback(...)` | Create traceback formatter |
-
-## 🆕 What's New in v0.3.0
-
-- **IceCream-compatible API**: Full `ic.configureOutput()`, `ic.disable()`, `ic.enable()` support
-- **Multiple color themes**: SolarizedDark, LitStyle, CyberpunkStyle, MonokaiStyle
-- **Style switching**: `set_style()` to change colors at runtime
-- **Rich-style features**: Console, Panel, styled text
-- **Pretty tracebacks**: Frame suppression, max_frames, Rich protocols
-- **Dynamic versioning**: Version from `__init__.py`
-- **Cleaner codebase**: Removed duplicate code, simplified architecture
+`Console`, `console`, `cprint`, `Panel`, `Box`, `Text`, `Span`, `Segment`,
+`Style`, and the `styles/` theme collection. `ic.print(markup=True)` covers the
+colored-output use case; use the real [Rich](https://github.com/Textualize/rich)
+if you need full-blown console rendering.
 
 ## 🤝 Contributing
 

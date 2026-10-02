@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-10-02
+
+### Added
+- `ic.print(*values, sep=, end=, file=, flush=, markup=, style=, highlight=)`: drop-in `print()` replacement with Rich-style inline markup
+- Logging helpers: `ic.log(level=...)` plus `ic.debug/info/success/warning/error/critical`
+- `contextMode` (`'auto' | 'always' | 'never'`) so context can be automatic or forced
+- Automatic context detection: `file:line in func` is only added when the
+  expression is not self-explanatory (calls, subscripts, operators, f-strings
+  and bare literals stay clean)
+- `litprinter.markup` with `render_markup`, `strip_markup`, `supports_color`
+- `ic.install()` / `ic.uninstall()` methods, plus `litprinter.print` alias
+- `py.typed` so type checkers use the inline annotations
+
+### Changed
+- The package is now focused on printing/debugging/tracebacks
+- README and docs rewritten around `ic()`, `ic.print()` and logging
+
+### Removed
+- Bundled Rich re-implementation: `Console`, `console`, `cprint`, `Panel`,
+  `Box`, `Text`, `Span`, `Segment`, `Style` and the `styles/` theme collection
+  (use `ic.print()` for colored output, or the real Rich package for panels)
+
 ## [0.3.5] - 2026-10-02
 
 ### Fixed

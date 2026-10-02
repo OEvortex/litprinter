@@ -1,8 +1,8 @@
 # LitPrinter Documentation
 
-Welcome to the LitPrinter documentation!
-
-LitPrinter is the most sophisticated debug printing library for Python - a powerful fusion of **IceCream** and **Rich** with beautiful formatting, syntax highlighting, and gorgeous tracebacks.
+LitPrinter is the debug printer that replaces `print()`, `logging` and
+`icecream` — smart debugging, a drop-in `print()`, logging helpers and
+syntax-highlighted tracebacks in one small package.
 
 ## Installation
 
@@ -15,211 +15,110 @@ pip install litprinter
 ```python
 # No import needed after pip install!
 x = 42
-ic(x)  # Output: ic| x: 42
+ic(x)                      # ic| x: 42
+ic.print("value:", x)      # value: 42
+ic.info("service ready")   # INFO  service ready
 ```
 
-That's it! After installing, `ic()` is automatically available in all your Python scripts - no import required!
+`ic` is registered in `builtins` automatically, so it works in every script.
 
-## Why LitPrinter?
+## Feature comparison
 
-LitPrinter combines the best of two worlds:
+| Feature | `print()` | IceCream | logging | LitPrinter |
+|---------|-----------|----------|---------|------------|
+| Shows variable names | ❌ | ✅ | ❌ | ✅ |
+| Replaces `print()` | ❌ | ❌ | ❌ | ✅ |
+| Colored markup | ❌ | ❌ | ❌ | ✅ |
+| Context only when useful | ❌ | ❌ | ✅ | ✅ |
+| Pretty tracebacks | ❌ | ❌ | ❌ | ✅ |
+| Zero-import | — | ❌ | — | ✅ |
 
-| Feature | print() | IceCream | LitPrinter |
-|---------|---------|----------|------------|
-| Shows variable names | ❌ | ✅ | ✅ |
-| Syntax highlighting | ❌ | ❌ | ✅ |
-| Rich-style panels | ❌ | ❌ | ✅ |
-| Pretty tracebacks | ❌ | ❌ | ✅ |
-| Context (file/line) | ❌ | ✅ | ✅ |
-| Configurable output | ❌ | ✅ | ✅ |
-| Enable/disable | ❌ | ✅ | ✅ |
-
-## Core Features
-
-### IceCream-Compatible API
+## Debugging
 
 ```python
-from litprinter import ic
-
-# Basic usage - shows variable names and values
-x, y = 10, 20
-ic(x, y)  # Output: ic| x: 10, y: 20
-
-# Works with expressions
-ic(x * 2)  # Output: ic| x * 2: 20
-
-# Empty call shows timestamp
-ic()  # Output: ic| 11:30:47.532
-
-# Returns values for inline use
-result = ic(calculate(x))  # Prints AND returns the value
+def calculate(a, b):
+    total = a + b
+    ic(total)               # ic| total: 30
+    ic(total * 2)           # ic| [app.py:3 in calculate()] >>> total * 2: 60
+    ic()                    # ic| app.py:3 in calculate() - 14:02:11.004
+    return total
 ```
 
-### Configuration
+Context rules (`contextMode='auto'` by default):
+
+| Call | Context | Reason |
+|------|---------|--------|
+| `ic(x)` | no | variable name already shown |
+| `ic(x + 1)` | yes | expression needs a location |
+| `ic(data["k"])` | yes | subscript needs a location |
+| `ic(f"{x}")` | no | value is self-describing |
+| `ic()` | yes | breadcrumb: where and when |
 
 ```python
-from litprinter import ic
+ic(x, includeContext=True)   # per-call force on
+ic(x, includeContext=False)  # per-call force off
 
-# Change the prefix
-ic.configureOutput(prefix='DEBUG| ')
-ic(x)  # Output: DEBUG| x: 10
-
-# Show file/line/function context
-ic.configureOutput(includeContext=True)
-ic(x)  # Output: DEBUG| [script.py:5 in my_function()] >>> x: 10
-
-# Use absolute paths
-ic.configureOutput(contextAbsPath=True)
-ic(x)  # Output: DEBUG| [C:\Users\koula\Desktop\litprinter\test_ic.py:5 in my_function()] >>> x: 10
-
-# Custom output function (e.g., to a logger)
-ic.configureOutput(outputFunction=my_logger.debug)
-ic(x)  # Output: DEBUG| x: 10
-
-# Custom argument formatting
-ic.configureOutput(argToStringFunction=my_formatter)
-ic(x)  # Output: DEBUG| x: 10
+ic.configureOutput(contextMode="always")   # 'auto' | 'always' | 'never'
+ic.configureOutput(contextAbsPath=True)    # absolute paths
 ```
 
-### Enable/Disable
+## `ic.print` — drop-in `print()`
+
+Identical signature to builtin `print()`, plus markup and highlighting:
 
 ```python
-from litprinter import ic
+ic.print("plain output")
+ic.print("a", "b", sep=" | ", end="!\n")
+ic.print("stderr line", file=sys.stderr, flush=True)
 
-# Disable output (values still pass through)
-ic.disable()
-result = ic(calculate())  # Silent, but returns value
-
-# Re-enable output
-ic.enable()
-ic("I'm back!")  # Output: ic| "I'm back!"
+ic.print("[bold red]ERROR[/bold red] connection refused")
+ic.print("[on_blue] INFO [/on_blue] listening on :8080")
+ic.print("styled", style="bold cyan")
+ic.print({"port": 8080}, highlight=True)
+ic.print("[literal]", markup=False)   # opt out of markup
 ```
 
-### Format Without Printing
+Markup tags: `bold`, `dim`, `italic`, `underline`, `strike`, `reverse`,
+`blink`, colors (`red`, `bright_red`, …), backgrounds (`on_blue`, …),
+`#hex` and `rgb(r,g,b)` values, closed with `[/]`.
+
+`from litprinter import print` gives you the same function.
+
+## Logging
 
 ```python
-from litprinter import ic
+ic.debug("cache miss", key)
+ic.info("connected", url)
+ic.success("migration done")
+ic.warning("retrying", attempt=2)
+ic.error("request failed", status=500)
+ic.critical("disk full")
 
-# Get formatted string without printing
-formatted = ic.format(x, y)
-my_logger.debug(formatted)
-ic(x)  # Output: DEBUG| x: 10
+ic.log("generic", level="info")
+ic.log("timestamped", level="warn", timestamp=True)
 ```
 
-### Per-Call Context Override
+Levels: `debug`, `info`, `success`, `warning`/`warn`, `error`, `critical`.
+Level output goes to stderr so piped stdout stays clean.
+
+## Configuration
 
 ```python
-from litprinter import ic
-
-# Override includeContext for a single call
-ic(x, includeContext=True)  # Shows context for this call only
-```
-
-## Rich-Style Console
-
-LitPrinter includes a Rich-compatible Console for styled output:
-
-```python
-from litprinter import Console
-
-console = Console()
-
-# Rich-style markup
-console.print("[bold red]Error:[/bold red] Something went wrong!")
-
-# Log with timestamp and location
-console.log("Processing started")
-
-# Horizontal rules
-console.rule("Section Header")
-
-# JSON with highlighting
-console.print_json({"name": "Alice", "age": 30})
-```
-
-## Beautiful Panels
-
-```python
-from litprinter import Panel
-
-# Basic panel
-panel = Panel("Hello, World!", title="Greeting")
-print(panel)
-# Output:
-# ╭ Greeting ────────╮
-# │ Hello, World!    │
-# ╰──────────────────╯
-
-# Fitted panel (doesn't expand)
-panel = Panel.fit("Short text", title="Fitted")
-```
-
-## Pretty Tracebacks
-
-```python
-from litprinter.traceback import install
-
-# Install globally
-install(
-    theme="cyberpunk",      # Color theme
-    show_locals=True,       # Show local variables
-    extra_lines=3,          # Context around error
+ic.configureOutput(
+    prefix="dbg| ",
+    contextMode="auto",
+    contextAbsPath=False,
+    pairDelimiter=", ",
+    outputFunction=my_logger.debug,
+    argToStringFunction=my_formatter,
 )
 
-# Now all exceptions show beautiful tracebacks!
+ic.disable()      # silent, values still returned
+ic.enable()
+s = ic.format(x)  # format without printing
 ```
 
-## Builtins Installation
-
-Make `ic()` available globally without imports (just like IceCream):
-
-```python
-from litprinter import install
-
-install()
-
-# Now works anywhere without import:
-ic(x)  # Available globally!
-```
-
-## API Reference
-
-### `ic(*args, **kwargs)`
-
-Debug print arguments and return them.
-
-**Parameters:**
-- `*args`: Values to debug print
-- `includeContext`: Override context setting for this call
-- `contextAbsPath`: Override path setting for this call
-
-**Returns:** 
-- `None` if no args
-- Single value if one arg
-- Tuple if multiple args
-
-### `ic.configureOutput(**kwargs)`
-
-Configure output settings.
-
-**Parameters:**
-- `prefix`: String or callable returning prefix
-- `outputFunction`: Function to call with formatted output
-- `argToStringFunction`: Function to convert args to strings
-- `includeContext`: Show file/line/function context
-- `contextAbsPath`: Use absolute paths in context
-
-### `ic.enable()` / `ic.disable()`
-
-Enable or disable debug output. When disabled, `ic()` still returns values but produces no output.
-
-### `ic.format(*args)`
-
-Format arguments without printing. Returns the formatted string.
-
-### `argumentToString(obj)`
-
-Convert an object to string representation. Supports singledispatch for custom types:
+## Custom formatters
 
 ```python
 from litprinter import argumentToString
@@ -231,58 +130,81 @@ class MyClass:
 @argumentToString.register(MyClass)
 def format_myclass(obj):
     return f"MyClass({obj.name})"
+
+ic(MyClass("test"))  # ic| MyClass(test)
 ```
 
-## Available Themes
-
-For tracebacks and syntax highlighting:
-
-- **JARVIS** - Inspired by Iron Man's AI
-- **RICH** - Balanced and readable
-- **MODERN** - Subtle with good contrast
-- **NEON** - Vibrant neon colors
-- **CYBERPUNK** - Pinks, blues, and yellows
-- **DRACULA** - Popular dark theme
-- **MONOKAI** - Classic color scheme
-- **SOLARIZED** - Low-contrast theme
-- **NORD** - Arctic-inspired colors
-- **GITHUB** - GitHub's color scheme
-- **VSCODE** - VS Code inspired
-- **MATERIAL** - Material design colors
-- **RETRO** - Nostalgic colors
-- **OCEAN** - Cool blue tones
-- **AUTUMN** - Warm fall colors
-- **SYNTHWAVE** - 80s inspired
-- **FOREST** - Natural greens
-- **MONOCHROME** - Black and white
-- **SUNSET** - Warm orange tones
-
-## Migration from IceCream
-
-LitPrinter is a drop-in replacement for IceCream:
+## Pretty tracebacks
 
 ```python
-# Before
-from icecream import ic
+from litprinter import traceback
 
-# After
-from litprinter import ic
+traceback.install(
+    theme="cyberpunk",
+    show_locals=True,
+    extra_lines=3,
+)
 ```
 
-All IceCream features work identically:
-- `ic(x)` - Debug print
-- `ic.configureOutput(...)` - Configure
-- `ic.disable()` / `ic.enable()` - Toggle
-- `ic.format(...)` - Format without print
+Themes available for tracebacks: `JARVIS`, `RICH`, `MODERN`, `NEON`,
+`CYBERPUNK`, `DRACULA`, `MONOKAI`, `SOLARIZED`, `NORD`, `GITHUB`, `VSCODE`,
+`MATERIAL`, `RETRO`, `OCEAN`, `AUTUMN`, `SYNTHWAVE`, `FOREST`, `MONOCHROME`,
+`SUNSET`.
 
-Plus you get:
-- Syntax highlighting
-- Rich-style panels and console
-- Beautiful tracebacks
-- 19 color themes
+## Builtins control
+
+```python
+from litprinter import install, uninstall
+
+install()     # re-register ic
+uninstall()   # remove ic from builtins
+```
+
+## API reference
+
+| API | Description |
+|-----|-------------|
+| `ic(*args, includeContext=None, contextAbsPath=None)` | Debug print, returns the values |
+| `ic.print(*values, sep, end, file, flush, markup, style, color, highlight)` | `print()` replacement |
+| `ic.log(*values, level, sep, file, flush, timestamp, markup)` | Logging output |
+| `ic.debug/info/success/warning/warn/error/critical` | Level shortcuts |
+| `ic.configureOutput(prefix, outputFunction, argToStringFunction, includeContext, contextAbsPath, contextMode, pairDelimiter)` | Configure output |
+| `ic.enable()` / `ic.disable()` | Toggle debug output |
+| `ic.format(*args)` | Format without printing |
+| `ic.install()` / `ic.uninstall()` | (Un)register builtins |
+| `set_style(style)` / `get_style()` | Theme control |
+| `argumentToString.register(Type)` | Custom formatters |
+| `render_markup(text, style=, color=)` | Render markup to ANSI |
+| `traceback.install(...)` / `traceback.uninstall()` | Pretty tracebacks |
+
+Aliases: `LIT`, `litprint`, `lit`.
+
+## Removed in 0.4.0
+
+The bundled Rich re-implementation was deleted to keep the package focused:
+`Console`, `console`, `cprint`, `Panel`, `Box`, `Text`, `Span`, `Segment`,
+`Style` and the `styles/` theme collection. Use `ic.print()` for colored
+markup, or [Rich](https://github.com/Textualize/rich) for full console
+rendering.
+
+## Migration
+
+```python
+# print -> ic
+print(f"user: {user['name']}")   # before
+ic(user["name"])                  # after
+
+# logging -> ic
+logger.info("connected to %s", url)  # before
+ic.info("connected", url)            # after
+
+# icecream -> litprinter
+from icecream import ic   # before
+# after: no import needed at all
+```
 
 ## Version
 
-Current version: **0.3.0**
+Current version: **0.4.0**
 
 For more examples, see the [GitHub repository](https://github.com/OEvortex/litprinter).

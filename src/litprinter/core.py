@@ -34,11 +34,11 @@ import ast
 import inspect
 import importlib
 import pprint
+import re
 import sys
 import warnings
 import functools
-import json
-from typing import Any, List, Type, Optional, Dict, Callable, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 # Optional imports
 try:
@@ -71,14 +71,27 @@ except ImportError:
     _Terminal256Formatter = None
     _Python3Lexer = None
 
-from .coloring import CyberpunkStyle
-
 # Sentinel for absent values
 _ABSENT = object()
 
+# Expressions that are self-describing enough to not need file/line context.
+_SIMPLE_EXPR_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
+_FSTRING_PREFIXES = (
+    'f"', "f'", 'F"', "F'", 'fr"', "fr'", 'rf"', "rf'",
+    'Fr"', "Fr'", 'fR"', "fR'", 'FR"', "FR'",
+    'rF"', "rF'", 'Rf"', "Rf'", 'RF"', "RF'",
+)
+
 # Default configuration
 DEFAULT_PREFIX = 'ic| '
-DEFAULT_OUTPUT_FUNCTION = lambda s: print(s, file=sys.stderr)
+
+
+def _default_output_function(s: str) -> None:
+    """Write a formatted line to stderr (default ic sink)."""
+    print(s, file=sys.stderr)
+
+
+DEFAULT_OUTPUT_FUNCTION = _default_output_function
 DEFAULT_ARG_TO_STRING_FUNCTION = pprint.pformat
 DEFAULT_CONTEXT_DELIMITER = ' - '
 DEFAULT_LINE_WRAP_WIDTH = 70
@@ -192,6 +205,37 @@ def _is_literal(s: object) -> bool:
         return True
     except Exception:
         return False
+
+
+def _is_fstring(expr: object) -> bool:
+    """Check if an expression is an f-string (its value is self-describing)."""
+    return isinstance(expr, str) and expr.startswith(_FSTRING_PREFIXES)
+
+
+def _is_simple_expr(expr: object) -> bool:
+    """Check if an expression is a bare name, literal or f-string.
+
+    ``ic(x)`` is self-explanatory, ``ic(x + 1)`` is not.
+    """
+    if expr is _ABSENT:
+        return False
+    if not isinstance(expr, str):
+        return False
+    if _is_fstring(expr) or _is_literal(expr):
+        return True
+    return bool(_SIMPLE_EXPR_RE.match(expr))
+
+
+def _needs_context(exprs: List[object], has_args: bool) -> bool:
+    """Decide whether file/line context is useful for this call.
+
+    Context is added automatically for calls, attribute access, subscripts,
+    operators, comprehensions, and when the source expression is unavailable
+    (REPL, frozen apps), because the printed value alone is ambiguous there.
+    """
+    if not has_args:
+        return True
+    return not all(_is_simple_expr(expr) for expr in exprs)
 
 
 # ============================================================================
@@ -390,8 +434,9 @@ class IceCreamDebugger:
         prefix: Union[str, Callable[[], str]] = DEFAULT_PREFIX,
         outputFunction: Callable[[str], None] = _colorized_stderr_print,
         argToStringFunction: Callable[[Any], str] = argumentToString,
-        includeContext: bool = False,
+        includeContext: Optional[bool] = None,
         contextAbsPath: bool = False,
+        contextMode: str = 'auto',
     ):
         """Initialize the IceCream debugger.
         
@@ -399,8 +444,10 @@ class IceCreamDebugger:
             prefix: Prefix string or callable returning prefix.
             outputFunction: Function to output formatted text.
             argToStringFunction: Function to convert args to strings.
-            includeContext: Whether to include file/line/function context.
+            includeContext: ``True``/``False`` to force context on/off.
+                ``None`` (default) respects ``contextMode``.
             contextAbsPath: Whether to use absolute paths in context.
+            contextMode: ``'auto'`` (default), ``'always'`` or ``'never'``.
         """
         self._enabled = True
         self._prefix = prefix
@@ -408,6 +455,7 @@ class IceCreamDebugger:
         self._argToStringFunction = argToStringFunction
         self._includeContext = includeContext
         self._contextAbsPath = contextAbsPath
+        self._contextMode = contextMode
     
     @property
     def enabled(self) -> bool:
@@ -429,6 +477,8 @@ class IceCreamDebugger:
         argToStringFunction: Optional[Callable[[Any], str]] = None,
         includeContext: Optional[bool] = None,
         contextAbsPath: Optional[bool] = None,
+        contextMode: Optional[str] = None,
+        pairDelimiter: Optional[str] = None,
     ) -> None:
         """Configure output settings.
         
@@ -436,15 +486,31 @@ class IceCreamDebugger:
             prefix: New prefix string or callable.
             outputFunction: New output function.
             argToStringFunction: New argument formatting function.
-            includeContext: Whether to include context.
+            includeContext: Force context on/off (``None`` respects
+                ``contextMode``).
             contextAbsPath: Whether to use absolute paths.
+            contextMode: ``'auto'``, ``'always'`` or ``'never'``.
+            pairDelimiter: Separator between debugged values.
             
         Raises:
             TypeError: If no arguments are provided.
+            ValueError: If ``contextMode`` is not a known mode.
         """
-        if all(arg is None for arg in [prefix, outputFunction, argToStringFunction, 
-                                        includeContext, contextAbsPath]):
+        if all(arg is None for arg in [prefix, outputFunction,
+                                        argToStringFunction, includeContext,
+                                        contextAbsPath, contextMode,
+                                        pairDelimiter]):
             raise TypeError("configureOutput() requires at least one argument")
+        
+        if contextMode is not None:
+            mode = contextMode.lower()
+            if mode not in ('auto', 'always', 'never'):
+                raise ValueError(
+                    "contextMode must be 'auto', 'always' or 'never'"
+                )
+            self._contextMode = mode
+            if includeContext is None:
+                self._includeContext = None
         
         if prefix is not None:
             self._prefix = prefix
@@ -456,6 +522,8 @@ class IceCreamDebugger:
             self._includeContext = includeContext
         if contextAbsPath is not None:
             self._contextAbsPath = contextAbsPath
+        if pairDelimiter is not None:
+            self._pair_delimiter = pairDelimiter
     
     def __call__(self, *args) -> Any:
         """Debug print the arguments and return them.
@@ -504,17 +572,49 @@ class IceCreamDebugger:
             Formatted string.
         """
         prefix = self._get_prefix()
-        context = self._format_context(call_frame) if self._includeContext else ''
+        arg_strs = self._extract_expressions(call_frame, args)
+        context = self._resolve_context(call_frame, arg_strs, bool(args))
         
         if not args:
-            # No args - just show context or time
+            # No args - show where we are and when
             time_str = self._format_time()
             if context:
-                return f"{prefix}{context}{time_str}"
+                return f"{prefix}{context}{DEFAULT_CONTEXT_DELIMITER}{time_str}"
             return f"{prefix}{time_str}"
         
         # Format the arguments
-        return self._format_args(call_frame, prefix, context, args)
+        return self._format_args(arg_strs, prefix, context, args)
+
+    def _extract_expressions(self, call_frame, args: tuple) -> List[object]:
+        """Recover the source text of each argument, or ``_ABSENT``."""
+        if call_frame is None:
+            return [_ABSENT] * len(args)
+
+        call_node = Source.executing(call_frame).node
+        if call_node is None:
+            warnings.warn(NO_SOURCE_WARNING, RuntimeWarning, stacklevel=5)
+            return [_ABSENT] * len(args)
+
+        source = Source.for_frame(call_frame)
+        return [
+            source.get_text_with_indentation(arg)
+            for arg in call_node.args
+        ]
+
+    def _resolve_context(self, call_frame, arg_strs, has_args: bool) -> str:
+        """Return the context string, honouring auto/always/never modes."""
+        if self._contextMode == 'never':
+            return ''
+        if self._contextMode == 'always':
+            return self._format_context(call_frame)
+        # auto
+        if self._includeContext is True:
+            return self._format_context(call_frame)
+        if self._includeContext is False:
+            return ''
+        if _needs_context(arg_strs, has_args):
+            return self._format_context(call_frame)
+        return ''
     
     def _get_prefix(self) -> str:
         """Get the current prefix string."""
@@ -547,11 +647,17 @@ class IceCreamDebugger:
         now = datetime.now()
         return now.strftime('%H:%M:%S.%f')[:-3]
     
-    def _format_args(self, call_frame, prefix: str, context: str, args: tuple) -> str:
+    def _format_args(
+        self,
+        arg_strs: List[object],
+        prefix: str,
+        context: str,
+        args: tuple,
+    ) -> str:
         """Format the argument values with their expressions.
         
         Args:
-            call_frame: The calling frame.
+            arg_strs: Source text for each argument (or ``_ABSENT``).
             prefix: Output prefix.
             context: Context string.
             args: Argument values.
@@ -559,60 +665,23 @@ class IceCreamDebugger:
         Returns:
             Formatted string.
         """
-        # Get the source expressions for arguments
-        if call_frame is None:
-            arg_strs = [_ABSENT] * len(args)
-        else:
-            call_node = Source.executing(call_frame).node
-        
-            if call_node is not None:
-                source = Source.for_frame(call_frame)
-                arg_strs = [
-                    source.get_text_with_indentation(arg)
-                    for arg in call_node.args
-                ]
-            else:
-                warnings.warn(NO_SOURCE_WARNING, RuntimeWarning, stacklevel=4)
-                arg_strs = [_ABSENT] * len(args)
-        
-        # Build pairs of (expression, value)
         pairs = list(zip(arg_strs, args))
         
-        # Format each pair
         formatted_pairs = []
         for expr, val in pairs:
             val_str = self._argToStringFunction(val)
             
-            # Check if expression is absent, a literal, or an f-string
-            # F-strings are evaluated immediately, so showing both source and value is redundant
-            is_fstring = expr is not _ABSENT and isinstance(expr, str) and (
-                expr.startswith('f"') or expr.startswith("f'") or
-                expr.startswith('F"') or expr.startswith("F'") or
-                expr.startswith('fr"') or expr.startswith("fr'") or
-                expr.startswith('rf"') or expr.startswith("rf'") or
-                expr.startswith('Fr"') or expr.startswith("Fr'") or
-                expr.startswith('fR"') or expr.startswith("fR'") or
-                expr.startswith('FR"') or expr.startswith("FR'") or
-                expr.startswith('rF"') or expr.startswith("rF'") or
-                expr.startswith('Rf"') or expr.startswith("Rf'") or
-                expr.startswith('RF"') or expr.startswith("RF'")
-            )
-            
-            if expr is _ABSENT or _is_literal(expr) or is_fstring:
-                # Just the value (skip redundant f-string source)
+            # Literals, f-strings and unknown sources print just the value.
+            if expr is _ABSENT or _is_literal(expr) or _is_fstring(expr):
                 formatted_pairs.append(val_str)
             else:
-                # Expression: value
                 formatted_pairs.append(f"{expr}: {val_str}")
         
-        # Join pairs
         args_str = self._pair_delimiter.join(formatted_pairs)
         
-        # Build the output
         if context:
             return f"{prefix}[{context}] >>> {args_str}"
-        else:
-            return f"{prefix}{args_str}"
+        return f"{prefix}{args_str}"
     
     def __repr__(self) -> str:
         return f"<IceCreamDebugger prefix={self._prefix!r} enabled={self._enabled}>"

@@ -5351,7 +5351,7 @@ if sys.version_info >= (3, 13):
 
 # litprinter: these are injected into builtins when litprinter is imported or
 # installed, so zero-import debug calls like ic(x) should type-check normally.
-from typing import Any as _LitAny, Callable as _LitCallable
+from typing import IO as _LitIO, Any as _LitAny, Callable as _LitCallable
 
 class _LitPrinterDebugger:
     """IceCream-compatible debug printer."""
@@ -5384,6 +5384,39 @@ class _LitPrinterDebugger:
     def format(self, *values: _LitAny) -> str:
         """Return the formatted debug string instead of printing it."""
         ...
+    def print(
+        self,
+        *values: _LitAny,
+        sep: str = ...,
+        end: str = ...,
+        file: _LitIO[str] | None = ...,
+        flush: bool = ...,
+        markup: bool = ...,
+        style: str | None = ...,
+        color: bool | None = ...,
+        highlight: bool = ...,
+    ) -> None:
+        """Drop-in replacement for print() with inline markup support."""
+        ...
+    def log(
+        self,
+        *values: _LitAny,
+        level: str = ...,
+        sep: str = ...,
+        file: _LitIO[str] | None = ...,
+        flush: bool = ...,
+        timestamp: bool = ...,
+        markup: bool = ...,
+    ) -> None:
+        """Print a logging-style line without importing logging."""
+        ...
+    def debug(self, *values: _LitAny, **kwargs: _LitAny) -> None: ...
+    def info(self, *values: _LitAny, **kwargs: _LitAny) -> None: ...
+    def success(self, *values: _LitAny, **kwargs: _LitAny) -> None: ...
+    def warning(self, *values: _LitAny, **kwargs: _LitAny) -> None: ...
+    def warn(self, *values: _LitAny, **kwargs: _LitAny) -> None: ...
+    def error(self, *values: _LitAny, **kwargs: _LitAny) -> None: ...
+    def critical(self, *values: _LitAny, **kwargs: _LitAny) -> None: ...
     @property
     def enabled(self) -> bool:
         """Whether ic() output is currently enabled."""
@@ -5399,6 +5432,12 @@ class _LitPrinterDebugger:
         ...
     def uninstall(self, name: str = ...) -> None:
         """Remove ic from builtins."""
+        ...
+    def enable(self) -> None:
+        """Enable ic() output."""
+        ...
+    def disable(self) -> None:
+        """Disable ic() output."""
         ...
 
 ic: _LitPrinterDebugger

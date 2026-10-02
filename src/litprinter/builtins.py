@@ -19,8 +19,6 @@ Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
 """
 
-from typing import Optional
-
 _builtins = __import__('builtins')
 
 
