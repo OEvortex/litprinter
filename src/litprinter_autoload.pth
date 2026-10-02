@@ -1,1 +1,1 @@
-exec("try: import litprinter\nexcept: pass")
+import litprinter_autoload

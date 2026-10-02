@@ -2,5 +2,8 @@ include LICENSE
 include README.md
 include CHANGELOG.md
 include CONTRIBUTING.md
+include src/litprinter_autoload.pth
+include src/litprinter_autoload.py
+include setup_helpers.py
 recursive-include docs *
 recursive-include tests *
