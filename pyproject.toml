@@ -62,6 +62,10 @@ where = ["src"]
 [tool.setuptools.dynamic]
 version = {attr = "litprinter.__version__"}
 
+[tool.ruff]
+extend-exclude = [".typeshed"]
+builtins = ["ic", "LIT", "litprint", "lit"]
+
 [tool.black]
 line-length = 88
 target-version = ["py38", "py39", "py310", "py311", "py312"]
@@ -76,15 +80,15 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
-# litprinter injects ic/LIT/litprint/lit into builtins at runtime, so without
-# importing them explicitly, static analyzers cannot prove their definitions.
-disable_error_code = ["name-defined"]
+custom_typeshed_dir = ".typeshed"
+exclude = "^\\.typeshed/"
 
 [tool.pyright]
-# litprinter injects ic/LIT/litprint/lit into builtins at runtime.
-reportUndefinedVariable = "none"
+typeshedPath = ".typeshed"
+exclude = [".typeshed"]
+
+[tool.ty.environment]
+typeshed = ".typeshed"
 
 [tool.ty.rules]
 unresolved-import = "ignore"
-# litprinter injects ic/LIT/litprint/lit into builtins at runtime.
-unresolved-reference = "ignore"

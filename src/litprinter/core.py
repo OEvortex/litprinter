@@ -183,8 +183,10 @@ class Source(executing.Source):
         return result.strip()
 
 
-def _is_literal(s: str) -> bool:
+def _is_literal(s: object) -> bool:
     """Check if a string represents a Python literal."""
+    if not isinstance(s, str):
+        return False
     try:
         ast.literal_eval(s)
         return True
@@ -516,9 +518,9 @@ class IceCreamDebugger:
     
     def _get_prefix(self) -> str:
         """Get the current prefix string."""
-        if callable(self._prefix):
-            return self._prefix()
-        return self._prefix
+        if isinstance(self._prefix, str):
+            return self._prefix
+        return self._prefix()
     
     def _format_context(self, call_frame) -> str:
         """Format the call context (file:line in function)."""

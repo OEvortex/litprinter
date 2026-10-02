@@ -45,9 +45,10 @@ ic(x)  # Output: ic| x: 42
 
 That's it! After installing, `ic()` is automatically available in all your Python scripts - no import required!
 
-> Type checkers cannot see names injected into `builtins` at runtime. If you want
-> strict static checking, prefer `from litprinter import ic`. This repo's
-> `pyproject.toml` disables the undefined-name diagnostics for zero-import usage.
+> This project ships `.typeshed` with `ic`/`LIT`/`litprint`/`lit` declared in
+> `builtins.pyi`, so editors using the project's ty/pyright/mypy config can
+> treat them like ordinary builtins. For maximal portability, explicit
+> `from litprinter import ic` is still best.
 
 ## 🎯 IceCream-Compatible API
 
