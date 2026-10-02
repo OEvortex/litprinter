@@ -623,9 +623,13 @@ class IceCreamDebugger:
         return self._prefix()
     
     def _format_context(self, call_frame) -> str:
-        """Format the call context (file:line in function)."""
+        """Format the call context.
+
+        Module-level code has no enclosing function, so the ``in <module>``
+        suffix is dropped and only ``file:line`` is shown.
+        """
         if call_frame is None:
-            return "<unknown>:0 in <unknown>"
+            return "<unknown>:0"
 
         frame_info = inspect.getframeinfo(call_frame)
         
@@ -634,13 +638,13 @@ class IceCreamDebugger:
         else:
             filename = basename(frame_info.filename)
         
-        lineno = frame_info.lineno
+        location = f"{filename}:{frame_info.lineno}"
         func_name = frame_info.function
         
-        if func_name != '<module>':
-            func_name = f'{func_name}()'
+        if func_name in ('<module>', '<string>', '<stdin>', '<exec>'):
+            return location
         
-        return f"{filename}:{lineno} in {func_name}"
+        return f"{location} in {func_name}()"
     
     def _format_time(self) -> str:
         """Format current time."""

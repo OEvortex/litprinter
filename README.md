@@ -60,7 +60,12 @@ def calculate(a, b):
     ic(total / len(items)) # ic| [app.py:3 in calculate()] >>> total / len(items): 10.0
     ic()                   # ic| app.py:3 in calculate() - 14:02:11.004
     return total
+
+ic(total * 2)             # ic| [app.py:9] >>> total * 2: 60  <- module level: no `in <module>`
 ```
+
+At module level (the top level of a script) there is no enclosing function, so
+the context is just `file:line`. Inside a function it also names the function.
 
 Context is added **only when it helps**:
 

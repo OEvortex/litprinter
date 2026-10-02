@@ -100,3 +100,30 @@ def test_debugger_prefix_callable():
     x = 3
     dbg(x)
     assert lines[-1] == 'cb| x: 3'
+
+
+def test_module_level_context_drops_in_module(out):
+    """Top-level code has no function, so `in <module>` is omitted."""
+    ic(len([1, 2, 3]))
+    assert 'in <module>' not in out[-1]
+    assert out[-1].startswith('ic| [test_ic.py:')
+    assert '>>> len([1, 2, 3]): 3' in out[-1]
+
+
+def test_context_keeps_function_name(out):
+    """Inside a function the `in name()` suffix is kept."""
+    def compute():
+        return len([1, 2, 3])
+
+    ic(compute())
+    # The context reports the caller frame, i.e. this test function.
+    assert 'in test_context_keeps_function_name()' in out[-1]
+
+
+def test_context_never_uses_unknown_form():
+    dbg = IceCreamDebugger(
+        prefix='ic| ',
+        outputFunction=lambda s: None,
+        contextMode='always',
+    )
+    assert dbg._format_context(None) == '<unknown>:0'

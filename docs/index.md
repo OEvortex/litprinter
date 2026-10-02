@@ -54,6 +54,17 @@ Context rules (`contextMode='auto'` by default):
 | `ic(f"{x}")` | no | value is self-describing |
 | `ic()` | yes | breadcrumb: where and when |
 
+Context format:
+
+| Where the call is | Output |
+|--------------------|--------|
+| top level of a script | `ic\| [app.py:9] >>> total * 2: 60` |
+| inside a function | `ic\| [app.py:3 in calculate()] >>> total * 2: 60` |
+| unknown frame | `ic\| [<unknown>:0] >>> ...` |
+
+There is no `in <module>` suffix: module-level code has no enclosing function,
+so only `file:line` is shown.
+
 ```python
 ic(x, includeContext=True)   # per-call force on
 ic(x, includeContext=False)  # per-call force off
@@ -205,6 +216,6 @@ from icecream import ic   # before
 
 ## Version
 
-Current version: **0.4.0**
+Current version: **0.4.1**
 
 For more examples, see the [GitHub repository](https://github.com/OEvortex/litprinter).

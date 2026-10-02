@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-10-02
+
+### Changed
+- Module-level `ic()` calls no longer print the `in <module>` suffix; the context
+  is now just `file:line` (e.g. `ic| [test.py:15] >>> add(5, 3): 8`). The
+  `in function()` suffix is still added inside functions, and `<string>`,
+  `<stdin>` and `<exec>` frames are treated the same way.
+
 ## [0.4.0] - 2026-10-02
 
 ### Added
