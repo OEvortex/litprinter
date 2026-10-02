@@ -76,6 +76,15 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
+# litprinter injects ic/LIT/litprint/lit into builtins at runtime, so without
+# importing them explicitly, static analyzers cannot prove their definitions.
+disable_error_code = ["name-defined"]
+
+[tool.pyright]
+# litprinter injects ic/LIT/litprint/lit into builtins at runtime.
+reportUndefinedVariable = "none"
 
 [tool.ty.rules]
 unresolved-import = "ignore"
+# litprinter injects ic/LIT/litprint/lit into builtins at runtime.
+unresolved-reference = "ignore"

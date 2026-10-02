@@ -45,6 +45,10 @@ ic(x)  # Output: ic| x: 42
 
 That's it! After installing, `ic()` is automatically available in all your Python scripts - no import required!
 
+> Type checkers cannot see names injected into `builtins` at runtime. If you want
+> strict static checking, prefer `from litprinter import ic`. This repo's
+> `pyproject.toml` disables the undefined-name diagnostics for zero-import usage.
+
 ## 🎯 IceCream-Compatible API
 
 LitPrinter is fully compatible with IceCream's API:
