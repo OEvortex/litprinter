@@ -190,7 +190,7 @@ class _IceCreamWrapper:
 
         line = sep.join(parts)
         if style and use_color:
-            line = render_markup(f"[{style}]{line}[/]", color=True)
+            line = render_markup(f'[{style}]{line}[/]', color=True)
         _write(line, file=file, end=end, flush=flush)
 
     # ------------------------------------------------------------------
@@ -223,8 +223,8 @@ class _IceCreamWrapper:
         key = level.lower()
         if key not in _LEVELS:
             raise ValueError(
-                f"Unknown log level {level!r}; expected one of "
-                f"{', '.join(sorted(_LEVELS))}"
+                f'Unknown log level {level!r}; expected one of '
+                f'{", ".join(sorted(_LEVELS))}'
             )
 
         stream = file if file is not None else sys.stderr
@@ -239,12 +239,12 @@ class _IceCreamWrapper:
         )
 
         if use_color:
-            label = f"{code}{label}\033[0m"
+            label = f'{code}{label}\033[0m'
         else:
             label = label.strip()
 
-        prefix = f"{time.strftime('%H:%M:%S')} " if timestamp else ""
-        _write(f"{prefix}{label} {body}", file=stream, flush=flush)
+        prefix = f'{time.strftime("%H:%M:%S")} ' if timestamp else ''
+        _write(f'{prefix}{label} {body}', file=stream, flush=flush)
 
     def debug(self, *values: Any, **kwargs: Any) -> None:
         """Log at DEBUG level."""
@@ -333,7 +333,7 @@ class _IceCreamWrapper:
         return self._debugger.enabled
 
     def __repr__(self) -> str:
-        return f"<ic enabled={self.enabled}>"
+        return f'<ic enabled={self.enabled}>'
 
 
 # ============================================================================
@@ -354,6 +354,7 @@ print = ic.print
 # ============================================================================
 # Module-level convenience functions
 # ============================================================================
+
 
 def configureOutput(
     prefix: Union[str, Callable[[], str], None] = None,

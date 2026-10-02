@@ -24,14 +24,14 @@ from __future__ import annotations
 import os
 import re
 import sys
-from typing import IO, Optional
+from typing import IO, List, Optional
 
 from .colors import Colors
 
-__all__ = ['render_markup', 'strip_markup', 'supports_color', 'render']
+__all__ = ['render_markup', 'strip_markup', 'supports_color']
 
 
-_TAG_RE = re.compile(r"\[(/)?([a-zA-Z0-9_#,\.\(\)\s]*)\]")
+_TAG_RE = re.compile(r'\[(/)?([a-zA-Z0-9_#,\.\(\)\s]*)\]')
 
 _STYLE_TAGS = {
     'bold': Colors.BOLD,
@@ -62,6 +62,8 @@ _COLOR_TAGS = {
     'bright_magenta': Colors.BRIGHT_MAGENTA,
     'bright_cyan': Colors.BRIGHT_CYAN,
     'bright_white': Colors.BRIGHT_WHITE,
+    'bright_gray': Colors.BRIGHT_BLACK,
+    'bright_grey': Colors.BRIGHT_BLACK,
 }
 
 _BACKGROUND_TAGS = {
@@ -73,6 +75,8 @@ _BACKGROUND_TAGS = {
     'on_magenta': Colors.BG_MAGENTA,
     'on_cyan': Colors.BG_CYAN,
     'on_white': Colors.BG_WHITE,
+    'on_gray': Colors.BG_BRIGHT_BLACK,
+    'on_grey': Colors.BG_BRIGHT_BLACK,
     'on_bright_black': Colors.BG_BRIGHT_BLACK,
     'on_bright_red': Colors.BG_BRIGHT_RED,
     'on_bright_green': Colors.BG_BRIGHT_GREEN,
@@ -102,10 +106,10 @@ def supports_color(stream: Optional[IO[str]] = None) -> bool:
         return False
 
 
-_RGB_RE = re.compile(r"^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$")
+_RGB_RE = re.compile(r'^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$')
 
 
-def _codes_for(tokens: str) -> list:
+def _codes_for(tokens: str) -> List[str]:
     """Translate a tag body into ANSI codes (unknown tokens are ignored)."""
     tokens = tokens.strip()
     rgb = _RGB_RE.match(tokens)
@@ -117,36 +121,20 @@ def _codes_for(tokens: str) -> list:
         key = token.strip().lower()
         if not key:
             continue
-        if key in _TAGS:
-            codes.append(_TAGS[key])
-        elif key.startswith('on_') and key[3:] in _COLOR_TAGS:
-            codes.append(_BACKGROUND_TAGS['on_' + key[3:]])
-        elif key.startswith('bright_') and key[7:] in _COLOR_TAGS:
-            codes.append(_COLOR_TAGS[key])
-        else:
-            code = _color_value(key)
-            if code:
-                codes.append(code)
+        code = _TAGS.get(key) or _color_value(key)
+        if code:
+            codes.append(code)
     return codes
 
 
 def _color_value(token: str) -> Optional[str]:
-    """Support ``#ff0000`` and ``rgb(255,0,0)`` color values."""
-    if token.startswith('#'):
-        try:
-            return Colors.from_hex(token)
-        except ValueError:
-            return None
-    if token.startswith('rgb(') and token.endswith(')'):
-        parts = token[4:-1].split(',')
-        if len(parts) != 3:
-            return None
-        try:
-            r, g, b = (int(p.strip()) for p in parts)
-        except ValueError:
-            return None
-        return Colors.rgb(r, g, b)
-    return None
+    """Resolve a ``#ff0000`` hex color value to an ANSI sequence."""
+    if not token.startswith('#'):
+        return None
+    try:
+        return Colors.from_hex(token)
+    except ValueError:
+        return None
 
 
 def render_markup(
@@ -184,15 +172,19 @@ def render_markup(
     position = 0
     for match in _TAG_RE.finditer(text):
         out.append(active_codes())
-        out.append(text[position:match.start()])
+        out.append(text[position : match.start()])
         position = match.end()
 
         closing, body = match.group(1), match.group(2).strip()
-        if closing or body in ('/', ''):
+        if bool(closing) or body == '/':
             if stack:
                 stack.pop()
                 out.append(Colors.RESET)
                 out.append(active_codes())
+            else:
+                # Nothing to close: treat it as literal text, not markup.
+                out.append(active_codes())
+                out.append(match.group(0))
             continue
 
         codes = _codes_for(body)
@@ -220,17 +212,10 @@ def render_markup(
 def strip_markup(text: str) -> str:
     """Remove recognized markup tags from ``text``."""
 
-    def _replace(match: re.Match) -> str:
+    def _replace(match: 're.Match[str]') -> str:
         closing, body = match.group(1), match.group(2).strip()
-        if closing or body in ('/', ''):
+        if bool(closing) or body == '/':
             return ''
         return '' if _codes_for(body) else match.group(0)
 
     return _TAG_RE.sub(_replace, str(text))
-
-
-def render(value: object, **kwargs) -> str:
-    """``str()`` a value, then render markup inside strings only."""
-    if isinstance(value, str):
-        return render_markup(value, **kwargs)
-    return str(value)

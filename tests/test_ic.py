@@ -112,6 +112,7 @@ def test_module_level_context_drops_in_module(out):
 
 def test_context_keeps_function_name(out):
     """Inside a function the `in name()` suffix is kept."""
+
     def compute():
         return len([1, 2, 3])
 

@@ -151,11 +151,16 @@ ic(MyClass("test"))  # ic| MyClass(test)
 from litprinter import traceback
 
 traceback.install(
-    theme="cyberpunk",
-    show_locals=True,
-    extra_lines=3,
+    theme="cyberpunk",       # litprinter theme or any Pygments style name
+    show_locals=True,        # show local variables
+    extra_lines=3,           # context lines around the error
+    suppress=["site-packages"],  # hide frames from these paths
+    max_frames=20,           # keep the stack short
+    locals_hide_sunder=True, # hide _private locals
 )
 ```
+
+Uninstall with `traceback.uninstall()`.
 
 Themes available for tracebacks: `JARVIS`, `RICH`, `MODERN`, `NEON`,
 `CYBERPUNK`, `DRACULA`, `MONOKAI`, `SOLARIZED`, `NORD`, `GITHUB`, `VSCODE`,
@@ -193,10 +198,12 @@ Aliases: `LIT`, `litprint`, `lit`.
 ## Removed in 0.4.0
 
 The bundled Rich re-implementation was deleted to keep the package focused:
-`Console`, `console`, `cprint`, `Panel`, `Box`, `Text`, `Span`, `Segment`,
-`Style` and the `styles/` theme collection. Use `ic.print()` for colored
-markup, or [Rich](https://github.com/Textualize/rich) for full console
-rendering.
+`Console`, `console`, `cprint`, `Panel`, `Box`, `Text`, `Span`, `Segment` and
+`Style`. Use `ic.print()` for colored markup, or
+[Rich](https://github.com/Textualize/rich) for full console rendering.
+
+`litprinter.styles` is **still shipped** — it holds the 19 traceback themes
+listed above.
 
 ## Migration
 
@@ -216,6 +223,6 @@ from icecream import ic   # before
 
 ## Version
 
-Current version: **0.4.1**
+Current version: **0.4.0**
 
 For more examples, see the [GitHub repository](https://github.com/OEvortex/litprinter).

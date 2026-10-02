@@ -36,7 +36,6 @@ import os
 import pprint
 import shutil
 import datetime
-import importlib
 from dataclasses import dataclass, field
 from types import TracebackType, FrameType, ModuleType, FunctionType, BuiltinFunctionType, MethodType
 from typing import (
@@ -49,120 +48,50 @@ from typing import (
     Type,
 )
 
-PygmentsStyle: Any
-
-ClassType = type
-
-# Type alias for suppression paths
-SuppressType = Iterable[str]
-
 # --- Pygments Requirement & Style Imports ---
-# We import all these Pygments components conditionally to support environments without Pygments
-# The token imports are for custom style definitions that may be needed in the future
-try:
-    # pylint: disable=unused-import
-    import pygments  # Base package import to check availability
-    from pygments import highlight  # Core highlighting function
-    from pygments.lexers import guess_lexer_for_filename  # Lexers for code parsing
-    from pygments.lexers.python import PythonLexer
-    from pygments.lexers.special import TextLexer
-    _pygments_terminal256 = importlib.import_module("pygments.formatters.terminal256")
-    _Terminal256Formatter = getattr(_pygments_terminal256, "Terminal256Formatter")
-    from pygments.style import Style as _PygmentsStyle  # Base style class
-    PygmentsStyle = _PygmentsStyle
-    from pygments.styles import get_style_by_name  # Function to get built-in styles
-    # Import all token types for potential use in custom styles
-    # These are used by the custom styles in the styles package
-    from pygments.token import (
-        Text, Name, Error, Other, String, Number, Keyword, Generic, Literal,
-        Comment, Operator, Whitespace, Punctuation
-    )
-    from pygments.util import ClassNotFound  # Exception for style/lexer not found
-    # pylint: enable=unused-import
-    HAS_PYGMENTS = True
+# Pygments is a hard dependency (see pyproject.toml), so these are plain
+# imports rather than guarded ones.
+from pygments import highlight
+from pygments.lexers import guess_lexer_for_filename
+from pygments.lexers.python import PythonLexer
+from pygments.lexers.special import TextLexer
+from pygments.formatters.terminal256 import Terminal256Formatter as _Terminal256Formatter
+from pygments.style import Style as PygmentsStyle
+from pygments.styles import get_style_by_name
+from pygments.util import ClassNotFound
 
-    # Import style classes from styles package
-    try:
-        # Import all style classes and the create_custom_style function
-        from .styles import (
-            JARVIS, RICH, MODERN, NEON, CYBERPUNK, DRACULA, MONOKAI,
-            SOLARIZED, NORD, GITHUB, VSCODE, MATERIAL, RETRO, OCEAN,
-            AUTUMN, SYNTHWAVE, FOREST, MONOCHROME, SUNSET, create_custom_style
-        )
+from .colors import Colors
+from .styles import (
+    JARVIS, RICH, MODERN, NEON, CYBERPUNK, DRACULA, MONOKAI,
+    SOLARIZED, NORD, GITHUB, VSCODE, MATERIAL, RETRO, OCEAN,
+    AUTUMN, SYNTHWAVE, FOREST, MONOCHROME, SUNSET,
+)
 
-        # Mapping for custom style names to the imported classes
-        CUSTOM_STYLES = {
-            "jarvis": JARVIS,
-            "rich": RICH,
-            "modern": MODERN,
-            "neon": NEON,
-            "cyberpunk": CYBERPUNK,
-            "dracula": DRACULA,
-            "monokai": MONOKAI,
-            "solarized": SOLARIZED,
-            "nord": NORD,
-            "github": GITHUB,
-            "vscode": VSCODE,
-            "material": MATERIAL,
-            "retro": RETRO,
-            "ocean": OCEAN,
-            "autumn": AUTUMN,
-            "synthwave": SYNTHWAVE,
-            "forest": FOREST,
-            "monochrome": MONOCHROME,
-            "sunset": SUNSET,
-        }
-    except ImportError:
-        # If styles package is not available, create an empty dictionary
-        CUSTOM_STYLES = {}
-        def create_custom_style(name, colors):
-            """Fallback custom style creator when styles package isn't available."""
-            return None
+# Mapping of the theme names accepted by install(theme=...) to style classes
+CUSTOM_STYLES = {
+    "jarvis": JARVIS,
+    "rich": RICH,
+    "modern": MODERN,
+    "neon": NEON,
+    "cyberpunk": CYBERPUNK,
+    "dracula": DRACULA,
+    "monokai": MONOKAI,
+    "solarized": SOLARIZED,
+    "nord": NORD,
+    "github": GITHUB,
+    "vscode": VSCODE,
+    "material": MATERIAL,
+    "retro": RETRO,
+    "ocean": OCEAN,
+    "autumn": AUTUMN,
+    "synthwave": SYNTHWAVE,
+    "forest": FOREST,
+    "monochrome": MONOCHROME,
+    "sunset": SUNSET,
+}
 
-except ImportError:
-    # Pygments itself is not installed - create fallback stubs
-    HAS_PYGMENTS = False
-    PygmentsStyle = type  # Use regular type as a base class substitute
-
-    # Create minimal stub implementations for Pygments functionality
-    # pylint: disable=unused-argument,missing-docstring
-    def highlight(code, lexer, formatter):
-        """Fallback highlight function that just returns the original code."""
-        return code
-
-    class PythonLexer:
-        """Stub for PythonLexer."""
-        pass
-
-    class TextLexer:
-        """Stub for TextLexer."""
-        pass
-
-    class Terminal256FormatterFallback:
-        """Stub for Terminal256Formatter."""
-        def __init__(self, **kwargs):
-            pass
-
-    _Terminal256Formatter = Terminal256FormatterFallback
-
-    def get_style_by_name(name):
-        """Stub for get_style_by_name."""
-        return None
-
-    def get_all_styles():
-        """Stub for get_all_styles."""
-        return []
-
-    def guess_lexer_for_filename(filename, code):
-        """Stub for guess_lexer_for_filename."""
-        return TextLexer()
-    # pylint: enable=unused-argument,missing-docstring
-
-    class ClassNotFound(Exception):
-        """Stub for ClassNotFound exception."""
-        pass
-
-    CUSTOM_STYLES = {}  # No pygments, no custom styles
+# Type alias for the frame-suppression patterns
+SuppressType = Iterable[str]
 
 
 # --- Configuration ---
@@ -184,19 +113,16 @@ STACK_SEPARATOR = "═"
 ERROR_LINE_MARKER = "❱"
 # Marker for code line numbers
 LINE_SEPARATOR = "│"
+# Module-level names hidden from show_locals (this module's own machinery)
+_MODULE_LEVEL_NOISE = frozenset({
+    "PrettyTraceback", "FrameInfo", "_SyntaxError", "Stack", "Trace",
+    "Styles", "install", "uninstall", "Traceback", "PygmentsStyle",
+    "CUSTOM_STYLES", "DEFAULT_THEME", "DEFAULT_EXTRA_LINES", "DEFAULT_WIDTH",
+    "MAX_VARIABLES", "MAX_VARIABLE_LENGTH", "LOCALS_MAX_DEPTH",
+    "STACK_SEPARATOR", "ERROR_LINE_MARKER", "LINE_SEPARATOR",
+})
 
 # --- ANSI Color Codes & Styles ---
-# Handle both package import and direct script execution
-try:
-    # When imported as part of the package
-    from .colors import Colors
-except ImportError:
-    # When run as a script
-    import sys
-    import os
-    sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
-    from litprinter.colors import Colors
-
 class Styles:
     """Styling utilities for traceback formatting.
 
@@ -209,7 +135,6 @@ class Styles:
     BOLD = Colors.BOLD
     DIM = Colors.DIM
     ITALIC = Colors.ITALIC
-    UNDERLINE = Colors.UNDERLINE
     RED = Colors.RED
     GREEN = Colors.GREEN
     YELLOW = Colors.YELLOW
@@ -326,46 +251,14 @@ class Styles:
         return Styles.BOLD + str(text) + Styles.RESET
 
     @staticmethod
-    def Italic(text: str) -> str:
-        """Apply italic style to text."""
-        return Styles.ITALIC + str(text) + Styles.RESET
-
-    @staticmethod
     def Dim(text: str) -> str:
         """Apply dim style to text."""
         return Styles.DIM + str(text) + Styles.RESET
 
     @staticmethod
-    def Underline(text: str) -> str:
-        """Apply underline style to text."""
-        return Styles.UNDERLINE + str(text) + Styles.RESET
-
-    @staticmethod
-    def style(text: str, *styles_list: str) -> str:
-        """Apply multiple styles to text.
-
-        Args:
-            text: The text to style
-            *styles_list: Variable number of style strings to apply
-
-        Returns:
-            The styled text with all styles applied
-        """
-        if not text: return ""
-        return "".join(styles_list) + str(text) + Styles.RESET
-
-    @staticmethod
     def strip_styles(text: str) -> str:
-        """Remove all ANSI style codes from text.
-
-        Args:
-            text: The text with ANSI codes to strip
-
-        Returns:
-            The text with all ANSI codes removed
-        """
-        import re
-        return re.sub(r'\033\[[0-9;]*m', '', text)
+        """Remove all ANSI escape sequences from text."""
+        return Colors.strip_ansi(text)
 
 # --- Data Classes ---
 @dataclass
@@ -399,6 +292,7 @@ class Stack:
     is_cause: bool = False  # Whether this is a cause of another exception
     is_context: bool = False  # Whether this is a context of another exception
     frames: List[FrameInfo] = field(default_factory=list)  # Stack frames
+    omitted_frames: int = 0  # How many frames max_frames dropped
 
 @dataclass
 class Trace:
@@ -416,7 +310,6 @@ class PrettyTraceback:
     - Support for exception chaining
     - Frame suppression for cleaner output
     - Customizable themes
-    - Rich protocol support for integration with Rich console
 
     Args:
         exc_type: The exception type
@@ -425,7 +318,6 @@ class PrettyTraceback:
         extra_lines: Number of extra lines to show around the error line
         theme: The syntax highlighting theme to use
         show_locals: Whether to show local variables
-        locals_max_length: Maximum length for variable representation
         locals_max_string: Maximum length for string variables
         locals_max_depth: Maximum depth for nested structures
         locals_hide_dunder: Whether to hide dunder variables
@@ -433,7 +325,6 @@ class PrettyTraceback:
         width: Terminal width (auto-detected if None)
         suppress: Paths/modules to suppress from traceback
         max_frames: Maximum number of frames to show
-        word_wrap: Whether to wrap long lines in code display
         _selected_pygments_style_cls: Pre-selected Pygments style class
     """
     def __init__(
@@ -443,9 +334,8 @@ class PrettyTraceback:
         tb: Optional[TracebackType],
         *,
         extra_lines: int = DEFAULT_EXTRA_LINES,
-        theme: str = DEFAULT_THEME,
+        theme: Any = DEFAULT_THEME,
         show_locals: bool = False,
-        locals_max_length: int = MAX_VARIABLE_LENGTH,
         locals_max_string: int = MAX_VARIABLE_LENGTH,
         locals_max_depth: int = LOCALS_MAX_DEPTH,
         locals_hide_dunder: bool = True,
@@ -453,16 +343,13 @@ class PrettyTraceback:
         width: Optional[int] = None,
         suppress: SuppressType = (),
         max_frames: int = 100,
-        word_wrap: bool = False,
         _selected_pygments_style_cls: Optional[Type[PygmentsStyle]] = None,
     ):
         self.exc_type = exc_type
         self.exc_value = exc_value
         self.tb = tb
         self.extra_lines = extra_lines
-        self.theme_name = theme
         self.show_locals = show_locals
-        self.locals_max_length = locals_max_length
         self.locals_max_string = locals_max_string
         self.locals_max_depth = locals_max_depth
         self.locals_hide_dunder = locals_hide_dunder
@@ -470,59 +357,90 @@ class PrettyTraceback:
         self.terminal_width = width or self._get_terminal_width()
         self.suppress = set(suppress)
         self.max_frames = max_frames
-        self.word_wrap = word_wrap
         self._pp = pprint.PrettyPrinter(depth=self.locals_max_depth, width=max(20, self.terminal_width - 20), compact=True)
 
         self.formatter = None
         self.style_cls = None
-        if HAS_PYGMENTS:
-            # Use the pre-selected style class if provided by install()
-            if _selected_pygments_style_cls:
-                self.style_cls = _selected_pygments_style_cls
-            else: # Determine style class if running standalone
+        # Use the pre-selected style class if provided by install()
+        if _selected_pygments_style_cls:
+            self.style_cls = _selected_pygments_style_cls
+        else: # Determine style class if running standalone
+            if isinstance(theme, str):
                 self.style_cls = CUSTOM_STYLES.get(theme.lower())
-                if not self.style_cls:
-                    try: self.style_cls = get_style_by_name(theme)
-                    except ClassNotFound:
-                        self.theme_name = DEFAULT_THEME
-                        self.style_cls = CUSTOM_STYLES.get(DEFAULT_THEME.lower()) or get_style_by_name('default')
+            if not self.style_cls and isinstance(theme, str):
+                try:
+                    self.style_cls = get_style_by_name(theme)
+                except ClassNotFound:
+                    pass
+            if not self.style_cls:
+                self.style_cls = (
+                    CUSTOM_STYLES.get(DEFAULT_THEME.lower())
+                    or get_style_by_name('default')
+                )
 
-            # Pass the CLASS to the formatter
-            if self.style_cls and _Terminal256Formatter:
-                try: self.formatter = _Terminal256Formatter(style=self.style_cls)
+            # Pass the CLASS to the formatter; on failure fall back to plain text
+            if self.style_cls:
+                try:
+                    self.formatter = _Terminal256Formatter(style=self.style_cls)
                 except Exception:
-                     self.formatter = None
-                     # Log error silently - we'll fall back to non-highlighted output
+                    self.formatter = None
 
         self.trace = self._extract_trace()
 
-    # --- Helper methods (_get_terminal_width, etc. - remain the same) ---
+    # --- Helper methods ---
     @staticmethod
     def _get_terminal_width() -> int:
-        try: width = shutil.get_terminal_size(fallback=(DEFAULT_WIDTH, 20)).columns; return max(40, width)
-        except Exception: return DEFAULT_WIDTH
+        try:
+            width = shutil.get_terminal_size(fallback=(DEFAULT_WIDTH, 20)).columns
+            return max(40, width)
+        except Exception:
+            return DEFAULT_WIDTH
+
     @staticmethod
     def _safe_str(obj: Any) -> str:
-        try: return str(obj)
-        except Exception: return "<exception str() failed>"
+        try:
+            return str(obj)
+        except Exception:
+            return "<exception str() failed>"
+
     @staticmethod
     def _is_library_file(filename: str) -> bool:
-        if not filename or '<' in filename or '>' in filename: return False
+        """True when a frame belongs to the stdlib or an installed package."""
+        if not filename or '<' in filename or '>' in filename:
+            return False
         try:
-            abs_path = os.path.abspath(filename); stdlib_dir = os.path.dirname(os.__file__)
-            site_packages_dirs = [p for p in sys.path if 'site-packages' in p or 'dist-packages' in p]
-            if stdlib_dir and abs_path.startswith(stdlib_dir): return True
-            if any(abs_path.startswith(p) for p in site_packages_dirs): return True
-        except Exception: pass
-        return False
+            abs_path = os.path.abspath(filename)
+            stdlib_dir = os.path.dirname(os.__file__)
+            if stdlib_dir and abs_path.startswith(stdlib_dir):
+                return True
+            site_packages_dirs = [
+                p for p in sys.path
+                if 'site-packages' in p or 'dist-packages' in p
+            ]
+            return any(abs_path.startswith(p) for p in site_packages_dirs)
+        except Exception:
+            return False
+
     @staticmethod
-    def _is_skippable_local(key: str, value: Any, frame_is_module: bool, locals_hide_dunder: bool) -> bool:
-        if locals_hide_dunder and key.startswith("__") and key.endswith("__"): return True
+    def _is_skippable_local(
+        key: str,
+        value: Any,
+        frame_is_module: bool,
+        hide_dunder: bool,
+        hide_sunder: bool,
+    ) -> bool:
+        """Decide whether a local variable should be hidden from show_locals."""
+        if hide_dunder and key.startswith("__") and key.endswith("__"):
+            return True
+        if hide_sunder and key.startswith("_") and not key.startswith("__"):
+            return True
         if frame_is_module:
-            if isinstance(value, (ModuleType, FunctionType, ClassType, BuiltinFunctionType, MethodType, Type)): return True
-            # Update skip list: Remove explicit style names, keep base class names
-            if key in ("PrettyTraceback", "FrameInfo", "_SyntaxError", "Stack", "Trace", "Styles", "install", "uninstall",
-                       "PygmentsStyle", "CUSTOM_STYLES"): return True # Remove JARVIS, RICH etc.
+            if isinstance(value, (ModuleType, FunctionType, type,
+                                  BuiltinFunctionType, MethodType)):
+                return True
+            # Module-level noise: this module's own machinery and themes.
+            if key in _MODULE_LEVEL_NOISE:
+                return True
         return False
 
     # --- Trace Extraction (_extract_trace, _extract_single_frame - remain the same) ---
@@ -580,10 +498,21 @@ class PrettyTraceback:
                 try:
                     is_first = True
                     for frame_obj, lineno in traceback.walk_tb(current_tb):
+                        filename = frame_obj.f_code.co_filename
+                        if self.is_suppressed(filename):
+                            is_first = False
+                            continue
                         is_module = is_first and (not frame_obj.f_back)
                         extracted_frames.append(self._extract_single_frame(frame_obj, lineno, is_module))
                         is_first = False
-                    stack.frames = extracted_frames
+                    if len(extracted_frames) > self.max_frames:
+                        # Keep the frames closest to the error.
+                        omitted = len(extracted_frames) - self.max_frames
+                        extracted_frames = extracted_frames[-self.max_frames:]
+                        stack.frames = extracted_frames
+                        stack.omitted_frames = omitted
+                    else:
+                        stack.frames = extracted_frames
                 except Exception as e:
                     error_msg = f"ERROR: Could not extract frames using walk_tb: {e}"
                     print(Styles.ERROR_STYLE + error_msg + Styles.RESET, file=sys.stderr)
@@ -648,7 +577,10 @@ class PrettyTraceback:
                 frame_locals_unfiltered = frame_obj.f_locals
                 frame_locals_filtered = {
                     k: v for k, v in frame_locals_unfiltered.items()
-                    if not self._is_skippable_local(k, v, is_module, self.locals_hide_dunder)
+                    if not self._is_skippable_local(
+                        k, v, is_module, self.locals_hide_dunder,
+                        self.locals_hide_sunder,
+                    )
                 }
             except Exception:
                 # If we can't access locals, provide a placeholder
@@ -666,21 +598,28 @@ class PrettyTraceback:
             is_library_file=is_lib
         )
 
-    # --- Formatting Helpers (_color_code_value, etc. - remain the same) ---
+    # --- Formatting Helpers ---
     def _color_code_value(self, value_repr: str) -> str:
+        """Colour a repr() string according to the kind of value it holds."""
         val = value_repr.strip()
-        if val == "None": return Styles.ValueNone(val)
-        if val == "True" or val == "False": return Styles.ValueBool(val)
-        if (val.startswith("'") and val.endswith("'")) or \
-           (val.startswith('"') and val.endswith('"')): return Styles.ValueStr(val)
-        if val.isdigit() or (val.startswith("-") and val[1:].isdigit()): return Styles.ValueNum(val)
-        try: float(val); return Styles.ValueNum(val)
-        except ValueError: pass
-        if val.startswith("<class ") or val.startswith("<function "): return Styles.ValueType(val)
-        if val.startswith("<module ") or val.startswith("<bound method "): return Styles.ValueType(val)
-        if val.startswith("{") or val.startswith("[") or val.startswith("("): return Styles.ValueContainer(val)
-        if val.startswith("<") and val.endswith(">"): return Styles.ValueContainer(val)
+
+        if val in ("None", "True", "False"):
+            return Styles.ValueNone(val) if val == "None" else Styles.ValueBool(val)
+
+        if len(val) >= 2 and val[0] == val[-1] and val[0] in "'\"":
+            return Styles.ValueStr(val)
+
+        if val.lstrip("-").replace(".", "", 1).isdigit():
+            return Styles.ValueNum(val)
+
+        if val.startswith(("<class ", "<function ", "<module ", "<bound method ")):
+            return Styles.ValueType(val)
+
+        if val.startswith(("{", "[", "(")) or (val.startswith("<") and val.endswith(">")):
+            return Styles.ValueContainer(val)
+
         return Styles.LocalsValue(val)
+
     def _format_locals(self, locals_dict: Dict[str, Any]) -> List[str]:
         """Format local variables for display in the traceback, with type info and better truncation."""
         if not locals_dict:
@@ -821,7 +760,7 @@ class PrettyTraceback:
                     highlighted_code = code_snippet
 
                     # Apply syntax highlighting if Pygments is available
-                    if HAS_PYGMENTS and self.formatter:
+                    if self.formatter:
                         # Default to plain text lexer
                         lexer = TextLexer()
 
@@ -938,6 +877,14 @@ class PrettyTraceback:
             if stack.frames:
                 yield ""
 
+            # Let the user know when max_frames dropped part of the stack.
+            if stack.omitted_frames:
+                yield ""
+                yield Styles.Muted(
+                    f"  ... {stack.omitted_frames} earlier frame(s) omitted "
+                    f"(max_frames={self.max_frames})"
+                )
+
             # Process each frame in the stack (in reverse order - most recent first)
             for frame_index, frame_info in enumerate(reversed(stack.frames)):
                 # Frame header with file, line, and function information
@@ -1036,34 +983,6 @@ class PrettyTraceback:
                 return True
         return False
     
-    def __rich_console__(self, console: Any, options: Any) -> Iterable[Any]:
-        """Rich console protocol for segment-based rendering.
-        
-        This method allows PrettyTraceback to be used with Rich-compatible
-        consoles that support the renderable protocol.
-        
-        Args:
-            console: The console instance.
-            options: Console rendering options.
-            
-        Yields:
-            Lines of the rendered traceback.
-        """
-        for line in self._render_traceback():
-            yield line + "\n"
-    
-    def __rich_measure__(self, console: Any, options: Any) -> tuple:
-        """Rich measure protocol for width calculation.
-        
-        Args:
-            console: The console instance.
-            options: Console rendering options.
-            
-        Returns:
-            Tuple of (minimum_width, maximum_width).
-        """
-        return (40, self.terminal_width)
-    
     def __str__(self) -> str:
         """Return rendered traceback as string."""
         return "\n".join(self._render_traceback())
@@ -1096,12 +1015,14 @@ def pretty_excepthook(exc_type: Type[BaseException], exc_value: BaseException, t
 def install(
     *,
     extra_lines: int = DEFAULT_EXTRA_LINES,
-    theme: str = DEFAULT_THEME,
+    theme: Any = DEFAULT_THEME,
     show_locals: bool = False,
-    locals_max_length: int = MAX_VARIABLE_LENGTH,
     locals_max_string: int = MAX_VARIABLE_LENGTH,
     locals_max_depth: int = LOCALS_MAX_DEPTH,
     locals_hide_dunder: bool = True,
+    locals_hide_sunder: bool = False,
+    suppress: SuppressType = (),
+    max_frames: int = 100,
     width: Optional[int] = None,
 ) -> Callable:
     """Install the pretty traceback handler as the default exception hook.
@@ -1111,14 +1032,18 @@ def install(
 
     Args:
         extra_lines: Number of extra lines to show around the error line
-        theme: The syntax highlighting theme to use. Can be either:
-            - A string name (e.g., "cyberpunk", "monokai")
-            - A Style class from litprinter.coloring (e.g., coloring.CYBERPUNK)
+        theme: The syntax highlighting theme. Either a litprinter theme name
+            (e.g. "cyberpunk", "dracula"), a Pygments built-in name (e.g.
+            "monokai", "friendly"), or any ``pygments.style.Style`` subclass.
+            Anything else is reported on stderr and falls back to
+            ``DEFAULT_THEME``.
         show_locals: Whether to show local variables in the traceback
-        locals_max_length: Maximum length for variable representation
         locals_max_string: Maximum length for string variables
         locals_max_depth: Maximum depth for nested structures
         locals_hide_dunder: Whether to hide dunder variables (__x__)
+        locals_hide_sunder: Whether to hide single-underscore variables (_x)
+        suppress: Path fragments whose frames are hidden (e.g. ``["site-packages"]``)
+        max_frames: Maximum number of frames to show; extra frames are dropped
         width: Terminal width (auto-detected if None)
 
     Returns:
@@ -1139,73 +1064,52 @@ def install(
     previous_hook = sys.excepthook
 
     # --- Determine Pygments Style CLASS ---
-    selected_style_cls = None
     actual_theme_name = theme
 
-    if HAS_PYGMENTS:
-        # Handle both string themes and class themes
-        if isinstance(theme, str):
-            theme_lower = theme.lower()
-            # First try custom styles from coloring.py
-            selected_style_cls = CUSTOM_STYLES.get(theme_lower)
-        elif isinstance(theme, type) and issubclass(theme, PygmentsStyle):
-            # If theme is already a Style class, use it directly
-            selected_style_cls = theme
-            actual_theme_name = theme.__name__
-        else:
-            # If it's neither a string nor a Style class, use the default
-            warning_msg = f"WARNING: Theme must be a string or Style class, got {type(theme)}. Using '{DEFAULT_THEME}' instead."
-            print(Styles.WARNING_STYLE + warning_msg + Styles.RESET, file=sys.stderr)
-            theme_lower = DEFAULT_THEME.lower()
-            selected_style_cls = CUSTOM_STYLES.get(theme_lower)
+    if isinstance(theme, str):
+        # A built-in litprinter theme, e.g. "cyberpunk".
+        selected_style_cls = CUSTOM_STYLES.get(theme.lower())
+    elif isinstance(theme, type) and issubclass(theme, PygmentsStyle):
+        # Already a Pygments Style class: use it as-is.
+        selected_style_cls = theme
+        actual_theme_name = theme.__name__
+    else:
+        warning = (
+            f"WARNING: Theme must be a string or Style class, got "
+            f"{type(theme)}. Using '{DEFAULT_THEME}' instead."
+        )
+        print(Styles.WARNING_STYLE + warning + Styles.RESET, file=sys.stderr)
+        theme = DEFAULT_THEME
+        actual_theme_name = DEFAULT_THEME
+        selected_style_cls = CUSTOM_STYLES.get(DEFAULT_THEME.lower())
 
-        # If not found and theme is a string, try built-in Pygments styles
-        if not selected_style_cls and isinstance(theme, str):
-            try:
-                # IMPORTANT: get_style_by_name returns the CLASS, not an instance
-                selected_style_cls = get_style_by_name(theme)
-            except ClassNotFound:
-                # If the requested theme is not found in built-in Pygments styles
-                if theme.lower() in CUSTOM_STYLES:
-                    # If it's a custom theme that exists in CUSTOM_STYLES but wasn't found earlier,
-                    # there might be an issue with the custom styles import
-                    warning_msg = f"WARNING: Custom style '{theme}' found in CUSTOM_STYLES but couldn't be loaded properly."
-                    print(Styles.WARNING_STYLE + warning_msg + Styles.RESET, file=sys.stderr)
-                else:
-                    # If it's not in CUSTOM_STYLES at all, it's an unknown theme
-                    warning_msg = f"WARNING: Theme '{theme}' not found. Using '{DEFAULT_THEME}' instead."
-                    print(Styles.WARNING_STYLE + warning_msg + Styles.RESET, file=sys.stderr)
-
-                actual_theme_name = DEFAULT_THEME
-
-                # Try the default theme in custom styles
-                selected_style_cls = CUSTOM_STYLES.get(DEFAULT_THEME.lower())
-
-                # If not found, try built-in Pygments styles
-                if not selected_style_cls:
-                    try:
-                        selected_style_cls = get_style_by_name('default')
-                    except ClassNotFound:
-                        # Last resort: create a simple default style if possible
-                        if 'create_custom_style' in globals() and create_custom_style is not None:
-                            try:
-                                # Create a simple default style with basic colors
-                                text_token = globals().get("Text", object)
-                                selected_style_cls = create_custom_style('DefaultStyle', {text_token: '#ffffff'})
-                            except Exception:
-                                selected_style_cls = None
-                        else:
-                            selected_style_cls = None
+    if selected_style_cls is None and isinstance(theme, str):
+        # Fall back to the Pygments built-in styles.
+        try:
+            selected_style_cls = get_style_by_name(theme)
+        except ClassNotFound:
+            warning = (
+                f"WARNING: Theme '{theme}' not found. "
+                f"Using '{DEFAULT_THEME}' instead."
+            )
+            print(Styles.WARNING_STYLE + warning + Styles.RESET, file=sys.stderr)
+            actual_theme_name = DEFAULT_THEME
+            selected_style_cls = (
+                CUSTOM_STYLES.get(DEFAULT_THEME.lower())
+                or get_style_by_name('default')
+            )
 
     # Store the configuration options for the traceback handler
     _current_hook_options = {
         "extra_lines": extra_lines,
         "theme": actual_theme_name,
         "show_locals": show_locals,
-        "locals_max_length": locals_max_length,
         "locals_max_string": locals_max_string,
         "locals_max_depth": locals_max_depth,
         "locals_hide_dunder": locals_hide_dunder,
+        "locals_hide_sunder": locals_hide_sunder,
+        "suppress": suppress,
+        "max_frames": max_frames,
         "width": width,
         "_selected_pygments_style_cls": selected_style_cls  # Pass the determined CLASS
     }
@@ -1251,76 +1155,7 @@ def uninstall() -> None:
 
         print(Styles.Muted("LitPrinter traceback handler uninstalled."), file=sys.stderr)
 
-# --- Example Usage ---
-if __name__ == "__main__":
-    print("\nLitPrinter Traceback Example\n")
-    print("This example demonstrates the enhanced traceback formatting.")
-    print("It will intentionally raise an exception to show the formatting.\n")
 
-    # Check if Pygments is installed
-    if not HAS_PYGMENTS:
-        print("\nNOTE: Pygments is not installed. Syntax highlighting will be disabled.")
-        print("To enable syntax highlighting, install Pygments with: pip install pygments\n")
 
-    # Install with local variable display enabled
-    # Using a built-in Pygments theme that's guaranteed to be available if Pygments is installed
-    install(show_locals=True, theme="monokai")
-
-    # You can try different themes:
-    # Built-in Pygments themes:
-    # install(show_locals=True, theme="friendly")
-    # install(show_locals=True, theme="colorful")
-    # install(show_locals=True, theme="vs")
-    # install(show_locals=True, theme="autumn")
-
-    # Custom themes (if coloring.py is properly set up):
-    # install(show_locals=True, theme="cyberpunk")
-    # install(show_locals=True, theme="dracula")
-    # install(show_locals=True, theme="nord")
-
-    def inner_function(a, b):
-        """Divide two numbers, will raise ZeroDivisionError if b is zero."""
-        # These variables are intentionally defined to demonstrate locals display in the traceback
-        sample_dict = {"key": "value", "num": 123.45, "bool": True}
-        sample_str = "abcdefghijklmnopqrstuvwxyz" * 5
-        sample_none = None
-        return a / b
-
-    def my_buggy_function(c):
-        """A function with a bug that will cause an exception."""
-        x = 10
-        y = 0  # This will cause a division by zero
-        greeting = "hello world"
-        numbers = [10, 20, 30, None, list(range(8))]
-        data = {"one": 1, "two": None, "nested": {"a": 1, "b": 2}}
-        print("About to call inner function...")
-        result = inner_function(x * c, y)
-        print(f"Result was: {result}")
-
-    print("\nExample 1: Simple exception\n")
-    try:
-        my_buggy_function(5)
-    except ZeroDivisionError:
-        print("\nCaught ZeroDivisionError as expected.\n")
-
-    print("\nExample 2: Exception chaining with 'raise from'\n")
-    try:
-        try:
-            my_buggy_function(5)
-        except ZeroDivisionError as e:
-            raise ValueError("Calculation failed due to division issue") from e
-    except ValueError:
-        print("\nCaught ValueError with chained ZeroDivisionError as expected.\n")
-
-    # Example 3: Syntax error (commented out by default)
-    # print("\nExample 3: Syntax error\n")
-    # try:
-    #     eval("x = 1 +")  # Syntax error
-    # except SyntaxError:
-    #     print("\nCaught SyntaxError as expected.\n")
-
-    uninstall()
-
-# Alias for Rich-compatible naming
+# Backwards-compatible alias
 Traceback = PrettyTraceback
-

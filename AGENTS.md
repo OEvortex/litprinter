@@ -22,28 +22,43 @@ Key patterns:
 
 ## Architecture
 
-- **`core.py`**: `IceCreamDebugger` class - main debugging logic with frame inspection
-- **`litprint.py`**: `_IceCreamWrapper` class - provides `ic(x)` callable with method access (`ic.configureOutput()`)
-- **`__init__.py`**: Public API exports, auto-installs `ic` to builtins
-- **`coloring.py`**: Pygments style definitions (TokyoNight, LitStyle, SolarizedDark, etc.)
-- **`styles/`**: Additional theme modules (cyberpunk.py, dracula.py, nord.py, etc.)
-- **`console.py`**: Rich-like Console class for styled output
-- **`panel.py`**: Panel rendering with borders and padding
-- **`traceback.py`**: Pretty traceback formatting
+- **`litprint.py`**: `_IceCreamWrapper` — the `ic(x)` callable plus
+  `ic.print()`, `ic.log()`, level shortcuts and `ic.configureOutput()`
+- **`core.py`**: `IceCreamDebugger` — argument formatting
+  (`argumentToString`), source-expression extraction, context resolution and
+  syntax highlighting
+- **`markup.py`**: inline `[bold red]...[/]` markup → ANSI, used by `ic.print()`
+- **`builtins.py`**: `install()` / `uninstall()` for the builtins registration
+- **`colors.py`**: the ANSI escape sequences used by markup and tracebacks
+- **`coloring.py`**: Pygments styles for `ic()` output (`set_style()`)
+- **`styles/`**: the 19 Pygments themes used by `traceback.install(theme=...)`
+- **`traceback.py`**: pretty tracebacks (`install()` / `uninstall()`)
+- **`py.typed`**: PEP 561 marker; `.typeshed/` also declares `ic` as a builtin
+  so editors show it like `print()`
 
 Core flow: `ic()` → `_IceCreamWrapper.__call__()` → `IceCreamDebugger._format()` → `_colorized_stderr_print()`
+
+## Removed in 0.4.0
+
+`console.py`, `panel.py`, `box.py`, `text.py`, `segment.py` and `style.py` were
+deleted along with their public exports (`Console`, `Panel`, `Box`, `Text`,
+`Span`, `Segment`, `Style`). Do not reintroduce a Rich re-implementation —
+`ic.print()` covers colored output.
 
 ## Build and Test
 
 Install for development:
 ```bash
-uv sync --group dev
+uv sync --extra dev
 ```
 
 Run tests:
 ```bash
 uv run pytest
 ```
+
+`test.py` is a manual smoke script (run `py test.py` to eyeball real terminal
+output), not part of the pytest suite.
 
 Package is in `src/litprinter/` (see `package-dir` in pyproject.toml).
 
@@ -59,3 +74,11 @@ Package is in `src/litprinter/` (see `package-dir` in pyproject.toml).
 
 - **Dependencies**: `pygments`, `colorama`, `executing`, `asttokens`
 - **Dev dependencies**: `pytest`, `pytest-cov`, `ruff`, `ty`
+
+## Static analysis notes
+
+`ic` is injected into `builtins` at runtime, which type checkers cannot see.
+The repo therefore ships `.typeshed/` (wired up via `[tool.ty.environment]`,
+`[tool.pyright]` and `[tool.mypy]`) plus `[tool.ruff] builtins = [...]`, so
+`ic` resolves as a real builtin. Add new `ic` methods to
+`.typeshed/stdlib/builtins.pyi` when you add them.

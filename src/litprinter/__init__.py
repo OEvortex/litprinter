@@ -25,12 +25,12 @@ License: MIT
 # ============================================================================
 
 from .litprint import (
-    ic,             # Main debug printer
-    LIT,            # Alias
-    litprint,       # Alias
-    lit,            # Alias
-    print,          # Drop-in replacement for builtin print()
-    log,            # Logging-style output
+    ic,  # Main debug printer
+    LIT,  # Alias
+    litprint,  # Alias
+    lit,  # Alias
+    print,  # Drop-in replacement for builtin print()
+    log,  # Logging-style output
     configureOutput,
     enable,
     disable,
@@ -44,7 +44,7 @@ from .litprint import (
 # Legacy alias
 from .core import LITPrintDebugger
 
-from .builtins import install, uninstall
+from .builtins import DEFAULT_NAMES, install, uninstall
 
 from .markup import render_markup, strip_markup, supports_color
 
@@ -84,10 +84,10 @@ from .traceback import (
 import builtins as _builtins
 
 for _name, _value in (
-    ("ic", ic),
-    ("LIT", LIT),
-    ("litprint", litprint),
-    ("lit", lit),
+    ('ic', ic),
+    ('LIT', LIT),
+    ('litprint', litprint),
+    ('lit', lit),
 ):
     setattr(_builtins, _name, _value)
 
@@ -95,7 +95,7 @@ for _name, _value in (
 # Version
 # ============================================================================
 
-__version__ = '0.4.1'
+__version__ = '0.4.0'
 
 
 # ============================================================================
@@ -104,44 +104,45 @@ __version__ = '0.4.1'
 
 __all__ = [
     # Main IceCream-compatible API
-    "ic",
-    "LIT",
-    "litprint",
-    "lit",
+    'ic',
+    'LIT',
+    'litprint',
+    'lit',
     # Printing
-    "print",
-    "log",
+    'print',
+    'log',
     # Configuration
-    "configureOutput",
-    "enable",
-    "disable",
-    "format",
-    "set_style",
-    "get_style",
-    "argumentToString",
-    "IceCreamDebugger",
-    "LITPrintDebugger",
+    'configureOutput',
+    'enable',
+    'disable',
+    'format',
+    'set_style',
+    'get_style',
+    'argumentToString',
+    'IceCreamDebugger',
+    'LITPrintDebugger',
     # Builtins
-    "install",
-    "uninstall",
+    'install',
+    'uninstall',
+    'DEFAULT_NAMES',
     # Markup
-    "render_markup",
-    "strip_markup",
-    "supports_color",
+    'render_markup',
+    'strip_markup',
+    'supports_color',
     # Themes
-    "TokyoNight",
-    "SolarizedDark",
-    "LitStyle",
-    "CyberpunkStyle",
-    "MonokaiStyle",
-    "DEFAULT_STYLE",
-    "Colors",
+    'TokyoNight',
+    'SolarizedDark',
+    'LitStyle',
+    'CyberpunkStyle',
+    'MonokaiStyle',
+    'DEFAULT_STYLE',
+    'Colors',
     # Traceback
-    "traceback",
-    "PrettyTraceback",
-    "Traceback",
-    "install_traceback",
-    "uninstall_traceback",
+    'traceback',
+    'PrettyTraceback',
+    'Traceback',
+    'install_traceback',
+    'uninstall_traceback',
     # Version
-    "__version__",
+    '__version__',
 ]

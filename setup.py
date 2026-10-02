@@ -8,10 +8,10 @@ from setuptools import setup
 
 def _patch_install_data() -> None:
     here = os.path.dirname(os.path.abspath(__file__))
-    helper_path = os.path.join(here, "setup_helpers.py")
+    helper_path = os.path.join(here, 'setup_helpers.py')
     if os.path.isfile(helper_path):
         spec = importlib.util.spec_from_file_location(
-            "litprinter_setup_helpers", helper_path
+            'litprinter_setup_helpers', helper_path
         )
         if spec and spec.loader:
             module = importlib.util.module_from_spec(spec)
@@ -21,5 +21,5 @@ def _patch_install_data() -> None:
 
 _patch_install_data()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     setup()

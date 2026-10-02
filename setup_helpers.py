@@ -24,9 +24,9 @@ def _patched_run(self) -> None:
     where they are actually executed at interpreter startup.
     """
 
-    install_cmd = self.distribution.get_command_obj("install")
-    purelib = getattr(install_cmd, "install_purelib", None) or getattr(
-        install_cmd, "install_lib", None
+    install_cmd = self.distribution.get_command_obj('install')
+    purelib = getattr(install_cmd, 'install_purelib', None) or getattr(
+        install_cmd, 'install_lib', None
     )
 
     if not isinstance(purelib, str) or not purelib:
@@ -45,14 +45,14 @@ def _patched_run(self) -> None:
             dest, files = item[0], list(item[1])
             keep_files = []
             for filename in files:
-                if str(filename).endswith(".pth"):
+                if str(filename).endswith('.pth'):
                     pth_files.append(str(filename))
                 else:
                     keep_files.append(filename)
             if keep_files:
                 kept_data_files.append((dest, keep_files))
         else:
-            if str(item).endswith(".pth"):
+            if str(item).endswith('.pth'):
                 pth_files.append(str(item))
             else:
                 kept_data_files.append(item)
@@ -91,10 +91,10 @@ def _patch_editable_pth() -> None:
     original_encode = _editable_wheel._encode_pth
 
     def patched_encode(content: str) -> bytes:
-        if "import litprinter_autoload" not in content:
-            if not content.endswith("\n"):
-                content += "\n"
-            content += "import litprinter_autoload\n"
+        if 'import litprinter_autoload' not in content:
+            if not content.endswith('\n'):
+                content += '\n'
+            content += 'import litprinter_autoload\n'
         return original_encode(content)
 
     _editable_wheel._encode_pth = patched_encode

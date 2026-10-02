@@ -5,127 +5,234 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.1] - 2026-10-02
-
-### Changed
-- Module-level `ic()` calls no longer print the `in <module>` suffix; the context
-  is now just `file:line` (e.g. `ic| [test.py:15] >>> add(5, 3): 8`). The
-  `in function()` suffix is still added inside functions, and `<string>`,
-  `<stdin>` and `<exec>` frames are treated the same way.
-
 ## [0.4.0] - 2026-10-02
 
+LitPrinter is now one focused tool: a debug printer, a `print()` replacement, a
+logging shortcut and pretty tracebacks. This release squashes the earlier
+0.3.4/0.3.5/0.4.x work into a single release.
+
 ### Added
-- `ic.print(*values, sep=, end=, file=, flush=, markup=, style=, highlight=)`: drop-in `print()` replacement with Rich-style inline markup
-- Logging helpers: `ic.log(level=...)` plus `ic.debug/info/success/warning/error/critical`
-- `contextMode` (`'auto' | 'always' | 'never'`) so context can be automatic or forced
-- Automatic context detection: `file:line in func` is only added when the
-  expression is not self-explanatory (calls, subscripts, operators, f-strings
-  and bare literals stay clean)
+
+**Printing**
+- `ic.print(*values, sep=, end=, file=, flush=, markup=, style=, color=, highlight=)`
+  — drop-in `print()` replacement with inline markup
 - `litprinter.markup` with `render_markup`, `strip_markup`, `supports_color`
-- `ic.install()` / `ic.uninstall()` methods, plus `litprinter.print` alias
+- Markup tags: `bold`, `dim`, `italic`, `underline`, `strike`, `reverse`,
+  `blink`, 16 colors (`[red]`, `[bright_red]`, …), backgrounds (`[on_blue]`, …),
+  `#hex` and `rgb(r,g,b)` values, closed with `[/]`
+- `litprinter.print` alias, so `from litprinter import print` works
+
+**Logging**
+- `ic.log(*values, level=)` and the `ic.debug/info/success/warning/error/critical`
+  shortcuts; output goes to stderr so piped stdout stays clean
+
+**Debugging**
+- `contextMode` (`'auto' | 'always' | 'never'`) plus per-call
+  `includeContext=True/False`
+- Automatic context detection: `file:line` is only shown when the expression
+  is not self-explanatory. Bare names, literals and f-strings stay clean;
+  calls, subscripts, attributes and operators get context.
+- `ic.install()` / `ic.uninstall()`, plus `litprinter.install` / `uninstall`
+  (which now round-trip all four registered names)
+- `pairDelimiter` option in `configureOutput()`
+
+**Tracebacks**
+- `install()` now honours `suppress=`, `max_frames=`, `locals_hide_sunder=`;
+  `max_frames` reports how many frames it dropped
+
+**Packaging and tooling**
+- Linux autoload: the `.pth` is a valid `import` line and is installed into
+  site-packages (not the wheel's `.data/data` directory); editable installs get
+  the same behaviour
+- Fixed missing `README.md` metadata on case-sensitive filesystems
+- Vendored `.typeshed/` so `ic`, `LIT`, `litprint` and `lit` are typed as real
+  builtins for ty, pyright/Pylance and mypy (hover docs, completions, no
+  "name not defined" errors)
 - `py.typed` so type checkers use the inline annotations
+- Test suite: 72 tests across `ic()`, `ic.print()`, logging, markup, builtins
+  and tracebacks
 
 ### Changed
-- The package is now focused on printing/debugging/tracebacks
+
+- Module-level `ic()` calls no longer print an `in <module>` suffix; the
+  context is just `file:line` (e.g. `ic| [test.py:15] >>> add(5, 3): 8`).
+  Inside functions the `in name()` suffix is still added.
+- Pygments, colorama, executing and asttokens are now plain imports rather than
+  optional-import guards — they are all declared dependencies
+- `litprinter.colors` trimmed to the ANSI helpers actually used
 - README and docs rewritten around `ic()`, `ic.print()` and logging
 
 ### Removed
+
 - Bundled Rich re-implementation: `Console`, `console`, `cprint`, `Panel`,
-  `Box`, `Text`, `Span`, `Segment`, `Style` and the `styles/` theme collection
-  (use `ic.print()` for colored output, or the real Rich package for panels)
+  `Box`, `Text`, `Span`, `Segment`, `Style`, plus the dead
+  `clearStyleCache`, `getStyleCacheInfo`, `isTerminalCapable` and
+  `DEFAULT_LINE_WRAP_WIDTH` helpers. Use `ic.print()` for colored output, or
+  the real Rich package for panels and full console rendering.
+- Rich console protocol hooks on `PrettyTraceback` (`__rich_console__`,
+  `__rich_measure__`)
+- Dead `word_wrap` and `locals_max_length` traceback options, which were
+  accepted but never applied
 
-## [0.3.5] - 2026-10-02
-
-### Fixed
-- Added a vendored typeshed under `.typeshed/` so `ic`, `LIT`, `litprint`, and `lit` are typed as builtins in editors and static checkers (ty, pyright/Pylance, mypy)
-
-## [0.3.4] - 2026-10-02
-
-### Fixed
-- Fixed autoload on Linux: `.pth` hooks are now valid `import` lines and are installed into site-packages instead of the wheel's `.data/data` directory
-- Fixed editable installs (`uv sync`/`pip install -e .`) so the generated editable `.pth` also autoloads `litprinter`
-- Fixed missing `README.md` metadata on case-sensitive filesystems by matching the actual readme filename
+> Note: `litprinter.styles` (the 19 traceback themes) is still shipped — the
+> traceback renderer depends on it. Use `traceback.install(theme=...)` to pick
+> one.
 
 ## [0.3.3] - 2025-12-08
 
 ### Fixed
+
 - ModuleNotFoundError in `litprinter_autoload.pth` by wrapping import in try-except
 - Fixed type checkings in codebase
 
 ## [0.3.0] - 2025-12-07
 
+
+
 ### 🚀 Major Release: IceCream + Rich Fusion
+
+
 
 This release transforms LitPrinter into a true fusion of IceCream debugging and Rich-style formatting.
 
+
+
 ### Added
 
+
+
 #### IceCream-Compatible API
+
 - Full `ic()` function with IceCream-compatible behavior
+
 - `ic.configureOutput()` for runtime configuration
+
 - `ic.disable()` and `ic.enable()` for toggling output
+
 - `ic.format()` for formatting without printing
+
 - Per-call context override with `includeContext` parameter
+
 - Aliases: `LIT`, `litprint`, `lit` all point to `ic`
 
+
+
 #### Color Themes
+
 - **SolarizedDark**: IceCream-compatible theme (now default)
+
 - **LitStyle**: Vibrant modern theme with brighter colors
+
 - **CyberpunkStyle**: Neon pink, teal, and green
+
 - **MonokaiStyle**: Classic code editor theme
+
 - `set_style()` function to switch themes at runtime
+
 - `get_style()` function to get current theme
 
+
+
 #### Rich-Style Features
+
 - `Segment` class for styled text representation
+
 - `Style` class for style composition and parsing
+
 - `Text` class with styled spans and markup support
+
 - `Box` class with 12+ predefined border styles
+
 - `Console` class with `print()`, `log()`, `rule()`, `status()` methods
+
 - `Panel` class with `fit()` classmethod and Rich protocols
 
+
+
 #### Traceback Enhancements
+
 - Frame suppression with `suppress` parameter
+
 - `max_frames` to limit displayed frames
+
 - `from_exception()` classmethod
+
 - `__rich_console__` and `__rich_measure__` protocols
+
 - `Traceback` alias for `PrettyTraceback`
 
+
+
 #### Infrastructure
+
 - Dynamic versioning from `__init__.py`
+
 - Added `asttokens` dependency for better source extraction
+
 - Updated Python version support (3.8-3.13)
 
+
+
 ### Changed
+
 - Complete rewrite of `core.py` with clean `IceCreamDebugger` class
+
 - Simplified `litprint.py` with `_IceCreamWrapper`
+
 - Fixed duplicate code in `builtins.py`
+
 - Default style changed to SolarizedDark for IceCream compatibility
 
+
+
 ### Removed
+
 - Deleted unused `_core_functions.py`
+
 - Removed legacy code patterns
+
+
 
 ## [0.2.1] - 2025-04-10
 
+
+
 ### Fixed
+
 - Module import issues
+
 - Panel rendering edge cases
+
+
 
 ## [0.2.0] - 2025-04-05
 
+
+
 ### Added
+
 - Initial public release
+
 - Variable inspection with expression display
+
 - Return value handling for inline usage
+
 - Support for custom formatters for specific data types
+
 - Execution context tracking
+
 - Rich-like colorized output with multiple themes (JARVIS, RICH, MODERN, NEON, CYBERPUNK)
+
 - Better JSON formatting with indent=2 by default
+
 - Advanced pretty printing for complex data structures with smart truncation
+
 - Clickable file paths in supported terminals and editors (VSCode compatible)
+
 - Enhanced visual formatting with better spacing and separators
+
 - Special formatters for common types (Exception, bytes, set, frozenset, etc.)
+
 - Smart object introspection for custom classes
+
 - Logging capabilities with timestamp and log levels

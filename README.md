@@ -165,8 +165,13 @@ traceback.install(
     theme="cyberpunk",
     show_locals=True,
     extra_lines=3,
+    suppress=["site-packages"],
+    max_frames=20,
 )
 ```
+
+Hide library frames with `suppress=[...]`, cap the stack with `max_frames`, and
+restore the default handler with `traceback.uninstall()`.
 
 Shows syntax-highlighted source, local variables, and a clean layout for
 uncaught exceptions.
@@ -254,10 +259,13 @@ Aliases: `LIT`, `litprint`, `lit` all point at `ic`.
 The bundled Rich re-implementation was removed so the package stays small and
 focused on printing/debugging:
 
-`Console`, `console`, `cprint`, `Panel`, `Box`, `Text`, `Span`, `Segment`,
-`Style`, and the `styles/` theme collection. `ic.print(markup=True)` covers the
-colored-output use case; use the real [Rich](https://github.com/Textualize/rich)
-if you need full-blown console rendering.
+`Console`, `console`, `cprint`, `Panel`, `Box`, `Text`, `Span`, `Segment` and
+`Style`. `ic.print(markup=True)` covers the colored-output use case; use the
+real [Rich](https://github.com/Textualize/rich) if you need full-blown console
+rendering or panels.
+
+`litprinter.styles` is **still shipped** — it holds the 19 syntax-highlighting
+themes used by `traceback.install(theme=...)`.
 
 ## 🤝 Contributing
 

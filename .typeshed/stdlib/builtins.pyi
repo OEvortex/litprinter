@@ -5372,8 +5372,10 @@ class _LitPrinterDebugger:
         argToStringFunction: _LitCallable[[_LitAny], str] | None = ...,
         includeContext: bool | None = ...,
         contextAbsPath: bool | None = ...,
+        contextMode: str | None = ...,
+        pairDelimiter: str | None = ...,
     ) -> None:
-        """Configure output formatting and routing."""
+        """Configure prefix, context mode, formatters and routing."""
         ...
     def enable(self) -> None:
         """Enable ic() output."""
@@ -5407,6 +5409,7 @@ class _LitPrinterDebugger:
         flush: bool = ...,
         timestamp: bool = ...,
         markup: bool = ...,
+        color: bool | None = ...,
     ) -> None:
         """Print a logging-style line without importing logging."""
         ...
@@ -5420,12 +5423,6 @@ class _LitPrinterDebugger:
     @property
     def enabled(self) -> bool:
         """Whether ic() output is currently enabled."""
-        ...
-    def set_style(self, style: type | str) -> None:
-        """Set the coloring style used by ic()."""
-        ...
-    def get_style(self) -> type:
-        """Return the current coloring style class."""
         ...
     def install(self, name: str = ...) -> None:
         """Install ic into builtins."""

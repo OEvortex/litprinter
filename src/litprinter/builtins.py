@@ -1,63 +1,58 @@
 #!/usr/bin/env python3
 """
-LitPrinter Builtins Module
+LitPrinter Builtins
 
-Provides functions to install litprinter functions into Python builtins,
-making them available globally without imports.
+Install and remove litprinter's globals from Python's builtins.
 
-Usage:
+Importing :mod:`litprinter` already registers ``ic`` (and the ``LIT`` /
+``litprint`` / ``lit`` aliases), so these helpers are only needed after an
+explicit :func:`uninstall`, or to register the printer under a second name.
+
+Usage::
+
     from litprinter import install, uninstall
-    
-    install()  # Now ic() works globally without import!
-    
-    # In any file, without import:
-    ic(x)
-    
-    uninstall()  # Remove from builtins
 
-Author: OEvortex <koulabhay25@gmail.com>
-License: MIT
+    uninstall()          # remove ic, LIT, litprint and lit
+    ic(1)                # NameError
+    install()            # put them back
+    install('dbg')       # or register under a different name
 """
 
-_builtins = __import__('builtins')
+import builtins
+
+#: The globals litprinter registers on import.
+DEFAULT_NAMES = ('ic', 'LIT', 'litprint', 'lit')
 
 
-def install(ic: str = 'ic') -> None:
-    """Install ic to Python builtins for global access.
-    
-    After calling this function, ic() will be available globally
-    without needing to import it.
-    
+def install(name: str = 'ic') -> None:
+    """Register the litprinter globals in builtins.
+
     Args:
-        ic: Name for the ic function in builtins (default: 'ic').
-    
-    Example:
-        >>> from litprinter import install
-        >>> install()
-        >>> # Now in any file, without import:
-        >>> ic(x)  # Works!
+        name: Register the printer under this name. Defaults to ``'ic'``.
+
+    Note:
+        Importing litprinter already registers ``ic``, ``LIT``, ``litprint``
+        and ``lit``, so calling this is only needed after :func:`uninstall`,
+        or to expose the printer under an extra name such as ``install('dbg')``.
     """
     import litprinter
-    setattr(_builtins, ic, litprinter.ic)
+
+    setattr(builtins, name, litprinter.ic)
 
 
-def uninstall(ic: str = 'ic') -> None:
-    """Remove ic from Python builtins.
-    
+def uninstall(name: str = 'ic') -> None:
+    """Remove a litprinter global from builtins.
+
     Args:
-        ic: Name of the function to remove (default: 'ic').
-    
-    Example:
-        >>> from litprinter import uninstall
-        >>> uninstall()
-        >>> ic(x)  # NameError: name 'ic' is not defined
+        name: The builtin to remove. Defaults to ``'ic'``. Pass ``'*'`` to
+            remove every name in :data:`DEFAULT_NAMES`.
     """
-    if hasattr(_builtins, ic):
-        delattr(_builtins, ic)
+    if name == '*':
+        for key in DEFAULT_NAMES:
+            delattr(builtins, key) if hasattr(builtins, key) else None
+        return
+    if hasattr(builtins, name):
+        delattr(builtins, name)
 
 
-# ============================================================================
-# Exports
-# ============================================================================
-
-__all__ = ['install', 'uninstall']
+__all__ = ['install', 'uninstall', 'DEFAULT_NAMES']

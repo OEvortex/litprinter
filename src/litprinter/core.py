@@ -25,51 +25,27 @@ Author: OEvortex <koulabhay25@gmail.com>
 License: MIT
 """
 
-from __future__ import print_function
 from datetime import datetime
 from contextlib import contextmanager
 from os.path import basename, realpath
 from textwrap import dedent
 import ast
 import inspect
-import importlib
+import executing
 import pprint
 import re
 import sys
 import warnings
 import functools
-from typing import Any, Callable, Dict, List, Optional, Union
-
-# Optional imports
-try:
-    colorama = importlib.import_module("colorama")
-    HAS_COLORAMA = True
-except ImportError:
-    colorama = None
-    HAS_COLORAMA = False
+from pygments import highlight
+from pygments.formatters.terminal256 import Terminal256Formatter
+from pygments.lexers.python import Python3Lexer
+from typing import Any, Callable, List, Optional, Union
 
 try:
-    executing = importlib.import_module("executing")
-except ImportError as exc:
-    raise ImportError(
-        "The 'executing' package is required for litprinter. "
-        "Install it with: pip install executing"
-    ) from exc
-
-try:
-    _pygments = importlib.import_module("pygments")
-    _pygments_formatters = importlib.import_module("pygments.formatters.terminal256")
-    _pygments_lexers = importlib.import_module("pygments.lexers.python")
-
-    highlight = getattr(_pygments, "highlight")
-    _Terminal256Formatter = getattr(_pygments_formatters, "Terminal256Formatter")
-    _Python3Lexer = getattr(_pygments_lexers, "Python3Lexer")
-    HAS_PYGMENTS = True
-except ImportError:
-    HAS_PYGMENTS = False
-    highlight = None
-    _Terminal256Formatter = None
-    _Python3Lexer = None
+    import colorama
+except ImportError:  # pragma: no cover - colorama is a declared dependency
+    colorama = None  # ty: ignore[invalid-assignment]
 
 # Sentinel for absent values
 _ABSENT = object()
@@ -84,17 +60,8 @@ _FSTRING_PREFIXES = (
 
 # Default configuration
 DEFAULT_PREFIX = 'ic| '
-
-
-def _default_output_function(s: str) -> None:
-    """Write a formatted line to stderr (default ic sink)."""
-    print(s, file=sys.stderr)
-
-
-DEFAULT_OUTPUT_FUNCTION = _default_output_function
 DEFAULT_ARG_TO_STRING_FUNCTION = pprint.pformat
 DEFAULT_CONTEXT_DELIMITER = ' - '
-DEFAULT_LINE_WRAP_WIDTH = 70
 
 NO_SOURCE_WARNING = (
     "Failed to access source code for analysis. "
@@ -108,6 +75,7 @@ NO_SOURCE_WARNING = (
 
 # Current style (can be changed)
 _current_style = None
+
 
 def set_style(style):
     """Set the syntax highlighting style.
@@ -123,52 +91,36 @@ def get_style():
     """Get the current syntax highlighting style."""
     global _current_style
     if _current_style is None:
-        try:
-            from .coloring import DEFAULT_STYLE
-            _current_style = DEFAULT_STYLE
-        except ImportError:
-            _current_style = None
+        from .coloring import DEFAULT_STYLE
+
+        _current_style = DEFAULT_STYLE
     return _current_style
 
 
 @contextmanager
 def _windows_color_support():
     """Enable color support on Windows terminals."""
-    if HAS_COLORAMA and colorama is not None:
-        colorama.init()
-        try:
-            yield
-        finally:
-            colorama.deinit()
-    else:
+    if colorama is None:
         yield
+        return
+
+    colorama.init()
+    try:
+        yield
+    finally:
+        colorama.deinit()
 
 
 def _create_formatter():
     """Create a Pygments formatter with the current style."""
-    if not HAS_PYGMENTS or _Terminal256Formatter is None:
-        return None
-    
-    style = get_style()
-    if style:
-        return _Terminal256Formatter(style=style)
-    return _Terminal256Formatter()
+    return Terminal256Formatter(style=get_style())
 
 
 def _colorize(text: str) -> str:
-    """Apply syntax highlighting to text."""
-    if (
-        not HAS_PYGMENTS
-        or highlight is None
-        or _Python3Lexer is None
-        or _Terminal256Formatter is None
-    ):
-        return text
-    
+    """Apply syntax highlighting to text, falling back to plain text."""
     try:
-        formatter = _create_formatter()
-        lexer = _Python3Lexer(ensurenl=False)
-        return highlight(text, lexer, formatter).rstrip()
+        lexer = Python3Lexer(ensurenl=False)
+        return highlight(text, lexer, _create_formatter()).rstrip()
     except Exception:
         return text
 
@@ -288,10 +240,7 @@ def _format_bytes(obj: bytes) -> str:
     """Format bytes objects."""
     if len(obj) > 50:
         return f"<bytes len={len(obj)}>"
-    try:
-        return repr(obj)
-    except Exception:
-        return f"<bytes len={len(obj)}>"
+    return repr(obj)
 
 
 @argumentToString.register(dict)
@@ -698,31 +647,3 @@ class IceCreamDebugger:
 # Alias for backward compatibility
 LITPrintDebugger = IceCreamDebugger
 
-
-# ============================================================================
-# Module-level Utilities
-# ============================================================================
-
-def clearStyleCache() -> None:
-    """Clear the style formatter cache (placeholder for compatibility)."""
-    pass
-
-
-def getStyleCacheInfo() -> Dict[str, Any]:
-    """Get style cache information."""
-    return {"cache_size": 0, "cached_styles": []}
-
-
-def isTerminalCapable() -> bool:
-    """Check if the terminal supports colors."""
-    import os
-    
-    # Respect NO_COLOR environment variable
-    if os.environ.get('NO_COLOR'):
-        return False
-    
-    # Check if stdout is a TTY
-    try:
-        return sys.stderr.isatty()
-    except Exception:
-        return False
